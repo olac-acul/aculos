@@ -6,7 +6,7 @@ con [niri](https://github.com/YaLTeR/niri) e [Noctalia](https://github.com/nocta
 
 È un progetto personale: le scelte seguono un uso preciso e possono cambiare senza preavviso.
 
-> **Stato:** fase 1, l'immagine è ancora `base-main` senza modifiche.
+> **Stato:** fase 2, base del desktop: niri, Noctalia, noctalia-greeter su greetd, portali, gnome-keyring, Tailscale.
 
 ## Struttura
 

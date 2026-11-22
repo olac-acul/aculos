@@ -1,0 +1,14 @@
+[Unit]
+Description=Prepara la configurazione di noctalia-greeter (primo avvio)
+# Crea greeter.toml e sync.toml in /var/lib/noctalia-greeter, una volta sola
+ConditionPathExists=!/var/lib/noctalia-greeter/greeter.toml
+After=systemd-sysusers.service systemd-tmpfiles-setup.service
+Before=greetd.service
+
+[Service]
+Type=oneshot
+Environment=GREETER_USER=greetd
+ExecStart=/usr/bin/noctalia-greeter-apply-appearance --setup-system
+
+[Install]
+WantedBy=greetd.service
