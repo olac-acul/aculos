@@ -1,0 +1,5 @@
+# Soglie di carica della batteria scrivibili dagli amministratori (gruppo wheel) senza sudo:
+# le usa il plugin della soglia nella barra di Noctalia. I valori iniziali sono in tmpfiles.d/aculos-batteria.conf.
+SUBSYSTEM=="power_supply", KERNEL=="BAT*", ACTION=="add|change", \
+    RUN+="/usr/bin/chgrp -f wheel /sys%p/charge_control_start_threshold /sys%p/charge_control_end_threshold", \
+    RUN+="/usr/bin/chmod -f g+w /sys%p/charge_control_start_threshold /sys%p/charge_control_end_threshold"

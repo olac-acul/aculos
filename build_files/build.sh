@@ -27,6 +27,9 @@ dnf5 -y install \
     fprintd \
     fprintd-pam
 
+# Fase 5: comandi usati dai plugin di Noctalia (udiskie per le chiavette USB)
+dnf5 -y install udiskie
+
 ### Pacchetti di Terra (Noctalia)
 # terra-release porta il file del repo e la chiave GPG; il repo resta installato ma spento,
 # e si accende solo per i pacchetti che servono.
