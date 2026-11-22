@@ -11,11 +11,11 @@
       "automerge": true,
       "matchUpdateTypes": ["pin", "pinDigest"]
     },
-    // This prevents the default demo image used in ublue-os/image-template
-    // from being pinned as it serves no purpose there
+    // base-main segue il tag della versione di Fedora (45): niente digest fissato,
+    // così la build di ogni giorno prende la base aggiornata
     {
       "matchDatasources": ["docker"],
-      "matchPackageNames": ["ghcr.io/ublue-os/bazzite"],
+      "matchPackageNames": ["ghcr.io/ublue-os/base-main"],
       "pinDigests": false
     },
     {
