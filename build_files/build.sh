@@ -80,5 +80,7 @@ rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
     noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd > /usr/share/aculos/versioni.txt
 cat /usr/share/aculos/versioni.txt
 
-### Pulizia: niente resti di dnf e delle policy SELinux in /run e /var (bootc container lint)
-rm -rf /run/dnf /run/selinux-policy /var/lib/dnf
+### Pulizia: niente resti in /run e /var (bootc container lint)
+# /var/lib/noctalia-greeter lo riempie il %post del pacchetto durante la build: si svuota, così lo prepara
+# aculos-greeter-setup.service al primo avvio, sul sistema vero.
+rm -rf /run/dnf /run/selinux-policy /run/tuned /var/lib/dnf /var/lib/noctalia-greeter
