@@ -130,11 +130,16 @@ jobs:
           ALIAS_TAGS: ${{ steps.gen-build-tags.outputs.alias_tags }}
         run: |
           set -euox pipefail
-          for tag in ${ALIAS_TAGS}; do
-            podman push --digestfile=/tmp/digestfile ${IMAGE_NAME}:${tag} ${IMAGE_REGISTRY}/${IMAGE_NAME}:${tag}
-          done
-
+          # Si carica l'immagine una volta sola, con il primo tag, e gli altri tag si copiano sul registro
+          # conservando il digest: così tutti i tag puntano alla stessa immagine e una firma vale per tutti.
+          # (Caricandola per ogni tag, podman la ricomprime e i digest vengono diversi, firmati solo in parte.)
+          read -r primo altri <<< "${ALIAS_TAGS}"
+          podman push --digestfile=/tmp/digestfile ${IMAGE_NAME}:${primo} ${IMAGE_REGISTRY}/${IMAGE_NAME}:${primo}
           digest=$(< /tmp/digestfile)
+          for tag in ${altri:-}; do
+            skopeo copy --preserve-digests --all \
+              docker://${IMAGE_REGISTRY}/${IMAGE_NAME}@${digest} docker://${IMAGE_REGISTRY}/${IMAGE_NAME}:${tag}
+          done
 
           echo "digest=${digest}" >> $GITHUB_OUTPUT
 

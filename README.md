@@ -6,7 +6,7 @@ con [niri](https://github.com/YaLTeR/niri) e [Noctalia](https://github.com/nocta
 
 È un progetto personale: le scelte seguono un uso preciso e possono cambiare senza preavviso.
 
-> **Stato:** fase 2, base del desktop: niri, Noctalia, noctalia-greeter su greetd, portali, gnome-keyring, Tailscale.
+> **Stato:** fase 3, preparazione dell'hardware: impronta digitale (anche nel blocco schermo, staccata a coperchio chiuso), profili energetici con tuned-ppd, soglie di carica. Sopra la base della fase 2: niri, Noctalia, noctalia-greeter su greetd, portali, gnome-keyring, Tailscale.
 
 ## Struttura
 

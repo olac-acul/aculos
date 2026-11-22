@@ -1,0 +1,11 @@
+[Unit]
+Description=Lettore di impronte staccato a coperchio chiuso
+After=systemd-udev-trigger.service
+
+[Service]
+ExecStart=/usr/libexec/aculos/impronta-coperchio
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

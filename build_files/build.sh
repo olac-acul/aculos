@@ -20,6 +20,13 @@ dnf5 -y install \
     kitty \
     tailscale
 
+# Fase 3: portatile. tuned-ppd al posto di power-profiles-daemon (stessa interfaccia D-Bus, che Noctalia usa);
+# intel-lpmd e thermald sono già nella base.
+dnf5 -y swap power-profiles-daemon tuned-ppd
+dnf5 -y install \
+    fprintd \
+    fprintd-pam
+
 ### Pacchetti di Terra (Noctalia)
 # terra-release porta il file del repo e la chiave GPG; il repo resta installato ma spento,
 # e si accende solo per i pacchetti che servono.
@@ -31,6 +38,20 @@ dnf5 -y install --enablerepo=terra \
 
 ### File di sistema del repo (system_files/) copiati in /, dopo i pacchetti così prevalgono sui loro default
 cp -avf "/ctx/system_files"/. /
+
+### Impronta digitale: il modo standard di Fedora (authselect), con due eccezioni
+# L'impronta vale per tutto ciò che usa system-auth (sudo, su, polkit). Il greeter e il servizio PAM "login"
+# (la password del blocco schermo di Noctalia) usano invece password-auth, che authselect lascia senza
+# pam_fprintd: al greeter serve la password per sbloccare il portachiavi, e il blocco schermo chiede
+# l'impronta per conto suo direttamente a fprintd.
+authselect enable-feature with-fingerprint
+grep -q pam_fprintd /etc/authselect/system-auth
+if grep -q pam_fprintd /etc/authselect/password-auth; then echo "pam_fprintd in password-auth" >&2; exit 1; fi
+sed -E 's/^(auth[[:space:]]+substack[[:space:]]+)system-auth$/\1password-auth/' \
+    /usr/lib/pam.d/greetd > /etc/pam.d/greetd
+sed -i -E 's/^(auth[[:space:]]+substack[[:space:]]+)system-auth$/\1password-auth/' /etc/pam.d/login
+grep -q -E '^auth[[:space:]]+substack[[:space:]]+password-auth$' /etc/pam.d/greetd
+grep -q -E '^auth[[:space:]]+substack[[:space:]]+password-auth$' /etc/pam.d/login
 
 ### Noctalia come servizio utente legato alla sessione di niri
 # Il servizio è quello fornito da Noctalia, con il WantedBy per niri attivato.
@@ -47,6 +68,8 @@ ln -sf /usr/share/aculos/niri/config.kdl /etc/niri/config.kdl
 systemctl enable greetd.service
 systemctl enable aculos-greeter-setup.service
 systemctl enable tailscaled.service
+systemctl enable tuned.service tuned-ppd.service
+systemctl enable aculos-impronta-coperchio.service
 systemctl set-default graphical.target
 # Il login grafico è greetd su tty1: niente getty sullo stesso terminale
 systemctl disable getty@tty1.service || true
@@ -54,5 +77,8 @@ systemctl disable getty@tty1.service || true
 ### Versioni dei componenti principali, per sapere quale build si sta usando
 mkdir -p /usr/share/aculos
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
-    noctalia-nightly noctalia-greeter niri greetd kitty tailscale > /usr/share/aculos/versioni.txt
+    noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd > /usr/share/aculos/versioni.txt
 cat /usr/share/aculos/versioni.txt
+
+### Pulizia: niente resti di dnf e delle policy SELinux in /run e /var (bootc container lint)
+rm -rf /run/dnf /run/selinux-policy /var/lib/dnf
