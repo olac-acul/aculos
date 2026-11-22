@@ -2,6 +2,7 @@
 FROM scratch AS ctx
 COPY build_files /
 COPY system_files /system_files
+COPY cosign.pub /cosign.pub
 
 # Base: Universal Blue base-main con la versione di Fedora fissata (si aggiorna a mano)
 FROM ghcr.io/ublue-os/base-main:45

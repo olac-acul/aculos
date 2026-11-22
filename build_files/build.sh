@@ -53,6 +53,26 @@ sed -i -E 's/^(auth[[:space:]]+substack[[:space:]]+)system-auth$/\1password-auth
 grep -q -E '^auth[[:space:]]+substack[[:space:]]+password-auth$' /etc/pam.d/greetd
 grep -q -E '^auth[[:space:]]+substack[[:space:]]+password-auth$' /etc/pam.d/login
 
+### Firma: bootc accetta aculOs solo se firmata con la chiave del repo (cosign.pub)
+# Stessa regola che la base usa per le immagini di Universal Blue. Dopo l'installazione (che scarica
+# l'immagine senza verificarla) il kickstart passa a questa con bootc switch --enforce-container-sigpolicy.
+install -D -m 644 /ctx/cosign.pub /etc/pki/containers/aculos.pub
+python3 -I - <<'FINE'
+import json
+p = "/etc/containers/policy.json"
+with open(p) as f:
+    politica = json.load(f)
+politica["transports"]["docker"]["ghcr.io/olac-acul/aculos"] = [{
+    "type": "sigstoreSigned",
+    "keyPath": "/etc/pki/containers/aculos.pub",
+    "signedIdentity": {"type": "matchRepository"},
+}]
+with open(p, "w") as f:
+    json.dump(politica, f, indent=4)
+    f.write("\n")
+FINE
+grep -q '"ghcr.io/olac-acul/aculos"' /etc/containers/policy.json
+
 ### Noctalia come servizio utente legato alla sessione di niri
 # Il servizio è quello fornito da Noctalia, con il WantedBy per niri attivato.
 sed 's/^# WantedBy=niri.service$/WantedBy=niri.service/' \
