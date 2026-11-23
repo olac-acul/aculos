@@ -1,0 +1,244 @@
+#!/usr/bin/python3 -I
+"""aculos-display: named display layouts for niri, stored as kanshi profiles.
+
+Arrange the screens any way you like (niri msg output, a display panel...), then save the result under a name.
+kanshi applies the saved layout again whenever the same set of screens is connected.
+
+Usage:
+  aculos-display list            profiles, which ones fit the connected screens, which one is active
+  aculos-display save <name>     save the current layout as profile <name> and make it active
+  aculos-display switch [<name>] activate <name>; without a name, the next profile that fits the connected screens
+  aculos-display remove <name>   delete profile <name>
+
+Profiles are files in ~/.config/kanshi/config.d/<name>.conf, included by ~/.config/kanshi/config. When several
+profiles fit the same screens, kanshi picks the first one in alphabetical order when the screens are connected.
+"""
+import fnmatch
+import json
+import os
+import re
+import subprocess
+import sys
+
+CONFIG_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "kanshi")
+CONFIG = os.path.join(CONFIG_DIR, "config")
+PROFILES_DIR = os.path.join(CONFIG_DIR, "config.d")
+PLACEHOLDER = "00-aculos.conf"
+NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+TRANSFORMS = {
+    "Normal": "normal", "90": "90", "180": "180", "270": "270",
+    "Flipped": "flipped", "Flipped90": "flipped-90", "Flipped180": "flipped-180", "Flipped270": "flipped-270",
+}
+
+
+def die(message):
+    print(f"aculos-display: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def connected_outputs():
+    try:
+        out = subprocess.run(["niri", "msg", "--json", "outputs"], check=True, capture_output=True, text=True).stdout
+    except (OSError, subprocess.CalledProcessError) as e:
+        die(f"cannot read the outputs from niri ({e})")
+    return list(json.loads(out).values())
+
+
+def description(o):
+    """The "make model serial" string kanshi matches against; missing fields are "Unknown"."""
+    return " ".join(o.get(k) or "Unknown" for k in ("make", "model", "serial"))
+
+
+def criteria(o):
+    """How a saved profile names an output: built-in panels by connector (stable), the others by description,
+    because connector names of external screens change between docks and ports."""
+    name = o["name"]
+    if name.startswith(("eDP", "LVDS", "DSI")) or description(o) == "Unknown Unknown Unknown":
+        return name
+    return description(o)
+
+
+def number(x):
+    return f"{x:.6f}".rstrip("0").rstrip(".")
+
+
+def output_line(o):
+    crit = criteria(o)
+    quoted = f'"{crit}"' if " " in crit else crit
+    logical, mode_index = o.get("logical"), o.get("current_mode")
+    if logical is None or mode_index is None:
+        return f"\toutput {quoted} disable"
+    mode = o["modes"][mode_index]
+    custom = "--custom " if o.get("is_custom_mode") else ""
+    parts = [
+        f"output {quoted} enable",
+        f"mode {custom}{mode['width']}x{mode['height']}@{number(mode['refresh_rate'] / 1000)}Hz",
+        f"position {logical['x']},{logical['y']}",
+        f"scale {number(logical['scale'])}",
+        f"transform {TRANSFORMS.get(logical['transform'], 'normal')}",
+    ]
+    if o.get("vrr_enabled"):
+        parts.append("adaptive_sync on")
+    return "\t" + " ".join(parts)
+
+
+def read_profiles():
+    """Profiles found in config.d, in kanshi's order: [(name, [criteria...])]."""
+    found = []
+    if not os.path.isdir(PROFILES_DIR):
+        return found
+    for entry in sorted(os.listdir(PROFILES_DIR)):
+        if not entry.endswith(".conf"):
+            continue
+        name, crits = None, []
+        with open(os.path.join(PROFILES_DIR, entry)) as f:
+            for line in f:
+                line = line.split("#", 1)[0].strip()
+                m = re.match(r"^profile\s+(\S+)\s*\{", line)
+                if m:
+                    if name:
+                        found.append((name, crits))
+                    name, crits = m.group(1), []
+                    continue
+                m = re.match(r'^output\s+(?:"([^"]+)"|(\S+))', line)
+                if m and name:
+                    crits.append(m.group(1) or m.group(2))
+        if name:
+            found.append((name, crits))
+    return found
+
+
+def fits(crits, outputs):
+    """True when the profile's outputs are exactly the connected ones."""
+    if len(crits) != len(outputs):
+        return False
+
+    def match(c, o):
+        return fnmatch.fnmatchcase(o["name"], c) or fnmatch.fnmatchcase(description(o), c)
+
+    return all(any(match(c, o) for o in outputs) for c in crits) and \
+        all(any(match(c, o) for c in crits) for o in outputs)
+
+
+def kanshi_active():
+    return subprocess.run(["systemctl", "--user", "--quiet", "is-active", "kanshi.service"]).returncode == 0
+
+
+def current_profile():
+    if not kanshi_active():
+        return None
+    r = subprocess.run(["kanshictl", "status"], capture_output=True, text=True)
+    if r.returncode != 0:
+        return None
+    try:
+        return json.loads(r.stdout).get("current_profile")
+    except ValueError:
+        m = re.search(r"current[ _]profile\W+(\S+)", r.stdout, re.I)
+        return m.group(1).strip('",') if m else None
+
+
+def ensure_placeholder():
+    """kanshi refuses to start when the include matches no file: keep an empty one while there are no profiles."""
+    if not any(e.endswith(".conf") for e in os.listdir(PROFILES_DIR)):
+        with open(os.path.join(PROFILES_DIR, PLACEHOLDER), "w") as f:
+            f.write("# Keeps kanshi's include valid while no profile is saved (written by aculos-display).\n")
+
+
+def ensure_config():
+    os.makedirs(PROFILES_DIR, exist_ok=True)
+    ensure_placeholder()
+    include = "include " + os.path.join(PROFILES_DIR, "*.conf").replace(os.path.expanduser("~"), "~", 1)
+    if not os.path.exists(CONFIG):
+        with open(CONFIG, "w") as f:
+            f.write("# kanshi configuration. Profiles saved by aculos-display are in config.d/.\n" + include + "\n")
+    else:
+        with open(CONFIG) as f:
+            if "config.d" not in f.read():
+                die(f"{CONFIG} does not include config.d: add the line\n  {include}")
+
+
+def reload_kanshi():
+    if kanshi_active():
+        subprocess.run(["kanshictl", "reload"], check=False)
+    else:
+        subprocess.run(["systemctl", "--user", "start", "kanshi.service"], check=False)
+
+
+def activate(name):
+    if not kanshi_active():
+        die("kanshi is not running (systemctl --user status kanshi.service)")
+    r = subprocess.run(["kanshictl", "switch", name], capture_output=True, text=True)
+    if r.returncode != 0:
+        die(f"cannot switch to '{name}': {(r.stderr or r.stdout).strip()}")
+    print(f"Active profile: {name}")
+
+
+def cmd_list():
+    outputs, current = connected_outputs(), current_profile()
+    print("Connected: " + ", ".join(f"{o['name']} ({description(o)})" for o in outputs))
+    profiles = read_profiles()
+    if not profiles:
+        print("No profiles yet: arrange the screens, then run 'aculos-display save <name>'.")
+    for name, crits in profiles:
+        marks = [m for m, on in (("active", name == current), ("fits", fits(crits, outputs))) if on]
+        print(f"  {name:<20} {', '.join(crits)}" + (f"  [{', '.join(marks)}]" if marks else ""))
+
+
+def cmd_save(name):
+    outputs = connected_outputs()
+    if not any(o.get("logical") for o in outputs):
+        die("no screen is on: nothing to save")
+    ensure_config()
+    path = os.path.join(PROFILES_DIR, f"{name}.conf")
+    lines = [f"# Saved by aculos-display. Screens: {', '.join(o['name'] for o in outputs)}",
+             f"profile {name} {{"] + [output_line(o) for o in outputs] + ["}", ""]
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+    print(f"Saved {path}")
+    reload_kanshi()
+    activate(name)
+
+
+def cmd_switch(name):
+    profiles = read_profiles()
+    if name:
+        if name not in [p for p, _ in profiles]:
+            die(f"no profile named '{name}' (see 'aculos-display list')")
+        return activate(name)
+    outputs = connected_outputs()
+    fitting = [p for p, crits in profiles if fits(crits, outputs)]
+    if not fitting:
+        die("no saved profile fits the connected screens")
+    current = current_profile()
+    following = fitting[(fitting.index(current) + 1) % len(fitting)] if current in fitting else fitting[0]
+    activate(following)
+
+
+def cmd_remove(name):
+    path = os.path.join(PROFILES_DIR, f"{name}.conf")
+    if not os.path.exists(path):
+        die(f"no profile named '{name}'")
+    os.remove(path)
+    ensure_placeholder()
+    print(f"Removed {path}")
+    if kanshi_active():
+        reload_kanshi()
+
+
+def main():
+    args = sys.argv[1:]
+    command = args[0] if args else ""
+    name = args[1] if len(args) > 1 else None
+    if len(args) > 2 or command not in ("list", "save", "switch", "remove") or (command == "list" and name):
+        print(__doc__.strip(), file=sys.stderr)
+        sys.exit(0 if command in ("-h", "--help") else 2)
+    if name and (not NAME_RE.match(name) or f"{name}.conf" == PLACEHOLDER):
+        die("profile names use letters, digits, '-' and '_'")
+    if command in ("save", "remove") and not name:
+        die(f"'{command}' needs a profile name")
+    {"list": cmd_list, "save": lambda: cmd_save(name), "switch": lambda: cmd_switch(name),
+     "remove": lambda: cmd_remove(name)}[command]()
+
+
+if __name__ == "__main__":
+    main()

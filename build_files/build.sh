@@ -50,6 +50,10 @@ dnf5 -y install \
     flatpak distrobox podman \
     firefox chromium
 
+# Fase 5: schermi esterni. kanshi riapplica la disposizione salvata per ogni combinazione di schermi (i profili
+# li scrive aculos-display), wl-mirror duplica uno schermo su un altro, wlr-randr serve per le diagnosi.
+dnf5 -y install kanshi wl-mirror wlr-randr
+
 ### Pacchetti di Terra (Noctalia)
 # terra-release porta il file del repo e la chiave GPG; il repo resta installato ma spento,
 # e si accende solo per i pacchetti che servono.
@@ -149,7 +153,7 @@ systemctl enable tuned.service tuned-ppd.service
 systemctl enable aculos-impronta-coperchio.service
 systemctl enable aculos-flathub.service aculos-flatpak-update.timer
 # Servizi utente: partono solo se l'utente ha la loro configurazione in ~/.config/aculos (vedi le unità)
-systemctl --global enable syncthing.service aculos-ntfy.service aculos-receive.service
+systemctl --global enable syncthing.service aculos-ntfy.service aculos-receive.service kanshi.service
 # Il timer utente di GRUB "boot riuscito" qui non serve e fallisce a ogni sessione: la configurazione statica di
 # bootupd non usa boot_success, e /boot è montato in sola lettura (visto in VM il 23/11).
 systemctl --global disable grub-boot-success.timer
@@ -162,7 +166,7 @@ systemctl disable getty@tty1.service || true
 mkdir -p /usr/share/aculos
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
     noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd syncthing \
-    firefox chromium librewolf codium mark-flowy starship > /usr/share/aculos/versioni.txt
+    firefox chromium librewolf codium mark-flowy starship kanshi wl-mirror > /usr/share/aculos/versioni.txt
 cat /usr/share/aculos/versioni.txt
 
 ### Pulizia: niente resti in /run e /var (bootc container lint)
