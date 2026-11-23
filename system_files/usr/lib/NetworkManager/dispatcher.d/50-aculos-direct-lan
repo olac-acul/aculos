@@ -1,0 +1,16 @@
+#!/bin/sh
+# Direct LAN: while the laptop is connected to one of the networks listed in /etc/aculos/direct-lan.conf (lines
+# NETWORK=address/prefix, for example the home network), traffic to that network leaves from the local network even
+# with Tailscale up (which, with --accept-routes, would send it into the VPN: table 52, rule 5270). The ip rule
+# (priority 5200) comes first; away from that network it is removed. NetworkManager runs this on every network change.
+conf=/etc/aculos/direct-lan.conf
+[ -r "$conf" ] || exit 0
+case "$2" in up|down|dhcp4-change|connectivity-change|reapply) ;; *) exit 0 ;; esac
+sed -n 's/^NETWORK=//p' "$conf" | while read -r net; do
+  [ -n "$net" ] || continue
+  if ip -4 route show table main exact "$net" proto kernel | grep -q -v -E 'dev (tailscale|virbr|docker)'; then
+    ip rule show | grep -q "to $net lookup main" || ip rule add to "$net" lookup main priority 5200
+  else
+    while ip rule del to "$net" lookup main priority 5200 2>/dev/null; do :; done
+  fi
+done

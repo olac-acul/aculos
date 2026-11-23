@@ -1,0 +1,90 @@
+# aculOs default zsh setup: no framework, just zsh, two plugins, fzf and starship.
+# Loaded by ~/.zshrc (see /etc/skel/.zshrc). Updated with the image: put your changes in ~/.zshrc, not here.
+
+# --- PATH: user tools (~/.local/bin) and npm global packages in the home (~/.npm/bin)
+typeset -U path
+path=("$HOME/.local/bin" "$HOME/.npm/bin" $path)
+
+# --- History: large, shared between terminals, with date and time
+HISTFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/history"
+[[ -d "${HISTFILE:h}" ]] || mkdir -p "${HISTFILE:h}"
+HISTSIZE=100000
+SAVEHIST=100000
+setopt EXTENDED_HISTORY SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_SPACE HIST_REDUCE_BLANKS HIST_VERIFY
+setopt AUTO_CD INTERACTIVE_COMMENTS NO_BEEP
+
+# --- Completion
+autoload -Uz compinit
+[[ -d "${XDG_CACHE_HOME:-$HOME/.cache}/zsh" ]] || mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+compinit -d "${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump"
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+
+# --- Keys: emacs style, word movement with Ctrl+arrows, Delete, Home, End
+bindkey -e
+bindkey '^[[1;5C' forward-word
+bindkey '^[[1;5D' backward-word
+bindkey '^[[3~' delete-char
+bindkey '^[[H' beginning-of-line
+bindkey '^[[F' end-of-line
+
+# --- Pager and man pages with bat
+export PAGER=less
+export LESS=-R
+if (( $+commands[bat] )); then
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+  export MANROFFOPT=-c
+fi
+
+# --- Aliases
+if (( $+commands[eza] )); then
+  alias ls='eza --icons=auto --group-directories-first'
+  alias la='eza -a --icons=auto --group-directories-first'
+  alias ll='eza -l --icons=auto --group-directories-first --git'
+  alias lla='eza -la --icons=auto --group-directories-first --git'
+  alias lt='eza --tree --level=2 --icons=auto'
+fi
+alias ..='cd ..'
+alias ...='cd ../..'
+alias grep='grep --color=auto'
+alias wget='wget -c'
+alias jctl='journalctl -p 3 -xb'
+alias psmem='ps -eo pid,user,rss,comm --sort=-rss | head -15'
+alias tarnow='tar -acf'
+alias untar='tar -xvf'
+
+# backup FILE: copies FILE to FILE.bak
+backup() { cp -a -- "$1" "$1.bak"; }
+# copy: copies standard input (or the given file) to the clipboard
+copy() { if (( $# )); then wl-copy < "$1"; else wl-copy; fi; }
+
+# --- Notification when a long command ends and the terminal is not focused (more than 10 s)
+zmodload zsh/datetime
+autoload -Uz add-zsh-hook
+_aculos_cmd_start() { _aculos_cmd="$1"; _aculos_t0=$EPOCHSECONDS; }
+_aculos_cmd_done() {
+  local st=$? t0=${_aculos_t0:-0} cmd="$_aculos_cmd"
+  unset _aculos_t0 _aculos_cmd
+  (( t0 )) || return
+  local dt=$(( EPOCHSECONDS - t0 ))
+  (( dt >= 10 )) || return
+  (( $+commands[notify-send] )) || return
+  # kitty tells whether its window is focused; in other terminals the notification is always sent
+  if [[ -n "$KITTY_WINDOW_ID" ]] && (( $+commands[kitty] )); then
+    kitty @ ls 2>/dev/null | grep -q '"is_focused": true' && return
+  fi
+  notify-send -a terminal -i utilities-terminal \
+    "$([[ $st -eq 0 ]] && echo Done || echo "Failed ($st)") in ${dt}s" "${cmd[1,200]}"
+}
+add-zsh-hook preexec _aculos_cmd_start
+add-zsh-hook precmd _aculos_cmd_done
+
+# --- fzf (Ctrl+R history, Ctrl+T files, Alt+C folders)
+[[ -r /usr/share/fzf/shell/key-bindings.zsh ]] && source /usr/share/fzf/shell/key-bindings.zsh
+
+# --- Prompt
+(( $+commands[starship] )) && eval "$(starship init zsh)"
+
+# --- Plugins (syntax highlighting must be loaded last)
+[[ -r /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+[[ -r /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh

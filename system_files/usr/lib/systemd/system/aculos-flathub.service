@@ -1,0 +1,15 @@
+[Unit]
+Description=Add the Flathub remote for Flatpak apps (system-wide)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=!/var/lib/flatpak/.aculos-flathub
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+ExecStart=/usr/bin/touch /var/lib/flatpak/.aculos-flathub
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -40,6 +40,16 @@ dnf5 -y install \
     wl-clipboard \
     adw-gtk3-theme
 
+# Fase 5: shell, strumenti da terminale, browser
+dnf5 -y install \
+    zsh zsh-autosuggestions zsh-syntax-highlighting \
+    eza bat ripgrep fd-find fzf jq btop duf plocate \
+    rsync pv socat wget2-wget unzip 7zip unrar \
+    chezmoi nodejs nodejs-npm \
+    igt-gpu-tools ethtool \
+    flatpak distrobox podman \
+    firefox chromium
+
 ### Pacchetti di Terra (Noctalia)
 # terra-release porta il file del repo e la chiave GPG; il repo resta installato ma spento,
 # e si accende solo per i pacchetti che servono.
@@ -48,6 +58,28 @@ dnf5 config-manager setopt terra.enabled=0
 dnf5 -y install --enablerepo=terra \
     noctalia-nightly \
     noctalia-greeter
+
+# Fase 5, sempre da Terra: prompt, bw per chezmoi, mise per provare strumenti in user space, VSCodium
+dnf5 -y install --enablerepo=terra \
+    starship \
+    bitwarden-cli \
+    mise \
+    codium
+
+### LibreWolf dal suo repo ufficiale (installato ma spento, come Terra)
+curl -fsSL https://repo.librewolf.net/librewolf.repo -o /etc/yum.repos.d/librewolf.repo
+dnf5 config-manager setopt librewolf.enabled=0
+dnf5 -y install --enablerepo=librewolf librewolf
+
+### MarkFlowy: RPM delle release di GitHub, con versione e sha256 fissati (non c'è un repo).
+# Per aggiornare: cambiare le due righe con i valori della release nuova (lo sha256 è nel campo "digest" dell'asset).
+MARKFLOWY_VERSION=1.4.0
+MARKFLOWY_SHA256=0f00d5cee1603a3da4372d777b66447f500abb20ab37c70875f1dfbaf8b1f50c
+curl -fsSL -o /tmp/markflowy.rpm \
+    "https://github.com/drl990114/MarkFlowy/releases/download/v${MARKFLOWY_VERSION}/MarkFlowy-${MARKFLOWY_VERSION}-1.x86_64.rpm"
+echo "${MARKFLOWY_SHA256}  /tmp/markflowy.rpm" | sha256sum -c -
+dnf5 -y install /tmp/markflowy.rpm
+rm -f /tmp/markflowy.rpm
 
 ### File di sistema del repo (system_files/) copiati in /, dopo i pacchetti così prevalgono sui loro default
 cp -avf "/ctx/system_files"/. /
@@ -97,12 +129,17 @@ systemctl --global enable noctalia.service
 mkdir -p /etc/niri
 ln -sf /usr/share/aculos/niri/config.kdl /etc/niri/config.kdl
 
+### Shell: zsh per i nuovi utenti (lo .zshrc di /etc/skel carica i default di /usr/share/aculos/zsh)
+sed -i 's|^SHELL=.*|SHELL=/usr/bin/zsh|' /etc/default/useradd
+grep -q '^SHELL=/usr/bin/zsh$' /etc/default/useradd
+
 ### Servizi di sistema
 systemctl enable greetd.service
 systemctl enable aculos-greeter-setup.service
 systemctl enable tailscaled.service
 systemctl enable tuned.service tuned-ppd.service
 systemctl enable aculos-impronta-coperchio.service
+systemctl enable aculos-flathub.service aculos-flatpak-update.timer
 # Servizi utente: partono solo se l'utente ha la loro configurazione in ~/.config/aculos (vedi le unità)
 systemctl --global enable syncthing.service aculos-ntfy.service aculos-receive.service
 systemctl set-default graphical.target
@@ -112,7 +149,8 @@ systemctl disable getty@tty1.service || true
 ### Versioni dei componenti principali, per sapere quale build si sta usando
 mkdir -p /usr/share/aculos
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
-    noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd syncthing > /usr/share/aculos/versioni.txt
+    noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd syncthing \
+    firefox chromium librewolf codium MarkFlowy starship > /usr/share/aculos/versioni.txt
 cat /usr/share/aculos/versioni.txt
 
 ### Pulizia: niente resti in /run e /var (bootc container lint)
