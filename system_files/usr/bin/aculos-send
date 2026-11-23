@@ -1,0 +1,20 @@
+#!/bin/bash
+# aculos-send: sends files and folders to a device on the VPN with Taildrop (tailscale file cp).
+# Folders are sent as .tar.gz. A notification shows the result at the end.
+# Usage: aculos-send <device> <file or folder>...   (for example from a Nautilus script)
+set -uo pipefail
+[ $# -ge 2 ] || { echo "Usage: aculos-send <device> <file or folder>..." >&2; exit 2; }
+dest="$1"; shift
+ok=0; ko=0
+for f in "$@"; do
+  if [ -d "$f" ]; then
+    tmp="$(mktemp -d)"; b="$(basename "$f")"
+    if tar -C "$(dirname "$f")" -czf "$tmp/$b.tar.gz" "$b" && tailscale file cp "$tmp/$b.tar.gz" "$dest:"; then
+      ok=$((ok+1)); else ko=$((ko+1)); fi
+    rm -rf "$tmp"
+  elif tailscale file cp "$f" "$dest:"; then ok=$((ok+1)); else ko=$((ko+1)); fi
+done
+msg="$ok sent to $dest"
+[ $ko -gt 0 ] && msg="$msg, $ko NOT sent (is the device reachable? is the VPN up?)"
+if command -v notify-send >/dev/null; then notify-send -i document-send "Send to $dest" "$msg"; else echo "$msg"; fi
+[ $ko -eq 0 ]

@@ -1,0 +1,27 @@
+#!/bin/bash
+# aculos-ssh on|off|status: turns sshd on or off so this machine can be reached (for example by a server's agents
+# for a diagnosis). When on, it listens only on the Tailscale IPv4 and accepts only keys (see
+# sshd_config.d/40-aculos.conf); it does not stay on after a reboot. sudo stays protected by the password.
+set -euo pipefail
+file=/etc/ssh/sshd_config.d/50-aculos-vpn.conf
+case "${1:-status}" in
+  on)
+    [ "$(id -u)" -eq 0 ] || exec sudo "$0" "$@"
+    ip="$(tailscale ip -4 2>/dev/null | head -1)"
+    [ -n "$ip" ] || { echo "aculos-ssh: Tailscale has no IPv4: is the VPN down?" >&2; exit 1; }
+    printf '# Written by aculos-ssh on: sshd listens only on the VPN\nListenAddress %s\n' "$ip" > "$file"
+    sshd -t
+    systemctl restart sshd.service
+    echo "sshd is on at $ip:22 (keys only). To turn it off: aculos-ssh off"
+    ;;
+  off)
+    [ "$(id -u)" -eq 0 ] || exec sudo "$0" "$@"
+    systemctl stop sshd.service
+    rm -f "$file"
+    echo "sshd is off."
+    ;;
+  status)
+    if systemctl is-active --quiet sshd.service; then echo "sshd is on: $(grep -h ListenAddress "$file" 2>/dev/null || echo 'on all interfaces')"; else echo "sshd is off."; fi
+    ;;
+  *) echo "Usage: aculos-ssh on|off|status" >&2; exit 2 ;;
+esac

@@ -1,0 +1,11 @@
+[Unit]
+Description=Receives files sent with Taildrop (aculos-receive)
+ConditionPathExists=%h/.config/aculos/receive.conf
+
+[Service]
+ExecStart=/usr/bin/aculos-receive
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

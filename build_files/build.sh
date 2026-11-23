@@ -30,6 +30,16 @@ dnf5 -y install \
 # Fase 5: comandi usati dai plugin di Noctalia (udiskie per le chiavette USB)
 dnf5 -y install udiskie
 
+# Fase 4: Syncthing e le app di sistema (file manager con anteprime, editor da terminale, appunti, tema GTK3)
+dnf5 -y install \
+    syncthing \
+    nautilus \
+    gvfs \
+    ffmpegthumbnailer \
+    micro \
+    wl-clipboard \
+    adw-gtk3-theme
+
 ### Pacchetti di Terra (Noctalia)
 # terra-release porta il file del repo e la chiave GPG; il repo resta installato ma spento,
 # e si accende solo per i pacchetti che servono.
@@ -93,6 +103,8 @@ systemctl enable aculos-greeter-setup.service
 systemctl enable tailscaled.service
 systemctl enable tuned.service tuned-ppd.service
 systemctl enable aculos-impronta-coperchio.service
+# Servizi utente: partono solo se l'utente ha la loro configurazione in ~/.config/aculos (vedi le unità)
+systemctl --global enable syncthing.service aculos-ntfy.service aculos-receive.service
 systemctl set-default graphical.target
 # Il login grafico è greetd su tty1: niente getty sullo stesso terminale
 systemctl disable getty@tty1.service || true
@@ -100,7 +112,7 @@ systemctl disable getty@tty1.service || true
 ### Versioni dei componenti principali, per sapere quale build si sta usando
 mkdir -p /usr/share/aculos
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
-    noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd > /usr/share/aculos/versioni.txt
+    noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd syncthing > /usr/share/aculos/versioni.txt
 cat /usr/share/aculos/versioni.txt
 
 ### Pulizia: niente resti in /run e /var (bootc container lint)

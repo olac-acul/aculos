@@ -1,0 +1,15 @@
+#!/bin/bash
+# aculos-remote: opens a session on the server set in ~/.config/aculos/remote.conf, for example from a launcher
+# entry that starts the terminal. The file is a shell snippet with two variables:
+#   HOST=ssh-name-or-alias
+#   COMMAND="command to run there"   (optional, for example a persistent tmux session)
+# Usage: aculos-remote [arguments appended to the command]
+set -euo pipefail
+conf="${XDG_CONFIG_HOME:-$HOME/.config}/aculos/remote.conf"
+[ -r "$conf" ] || { echo "aculos-remote: missing $conf (HOST=..., COMMAND=...)" >&2; exit 1; }
+HOST=""; COMMAND=""
+# shellcheck source=/dev/null
+. "$conf"
+[ -n "$HOST" ] || { echo "aculos-remote: HOST is not set in $conf" >&2; exit 1; }
+# shellcheck disable=SC2086
+exec ssh -t "$HOST" ${COMMAND} "$@"

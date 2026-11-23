@@ -1,0 +1,68 @@
+#!/usr/bin/python3 -I
+"""aculos-ntfy: shows the messages of an ntfy channel on the desktop (for example a server's notifications).
+
+Each message becomes a desktop notification (notify-send); its buttons and a click open their link in the browser.
+It reconnects by itself and does not lose the messages that arrived meanwhile. Runs as aculos-ntfy.service.
+
+Configuration in ~/.config/aculos/:
+  ntfy.conf     URL=https://server/channel   (one line; required)
+  ntfy-token    the access token, if the channel needs one (only the token; keep the file out of git)
+"""
+import json
+import os
+import subprocess
+import threading
+import time
+import urllib.request
+from pathlib import Path
+
+CONF = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "aculos"
+
+
+def read_url():
+    for line in (CONF / "ntfy.conf").read_text().splitlines():
+        if line.strip().startswith("URL="):
+            return line.split("=", 1)[1].strip().strip('"').rstrip("/")
+    raise SystemExit(f"aculos-ntfy: missing URL= in {CONF / 'ntfy.conf'}")
+
+
+def show(m):
+    actions = [a for a in m.get("actions", []) if a.get("action") == "view"]
+    cmd = ["notify-send", "-a", m.get("topic") or "ntfy",
+           "-u", "critical" if m.get("priority", 3) >= 4 else "normal", "-i", "utilities-terminal"]
+    links = {}
+    if m.get("click"):
+        cmd += ["-A", "default=Open"]
+        links["default"] = m["click"]
+    for i, a in enumerate(actions):
+        cmd += ["-A", f"a{i}={a['label']}"]
+        links[f"a{i}"] = a["url"]
+    cmd += [m.get("title") or m.get("topic") or "ntfy", m.get("message", "")]
+    choice = subprocess.run(cmd, capture_output=True, text=True).stdout.strip()  # waits only if there are actions
+    if choice in links:
+        subprocess.Popen(["xdg-open", links[choice]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def main():
+    url = read_url() + "/json"
+    token_file = CONF / "ntfy-token"
+    since, wait = None, 5
+    while True:
+        try:
+            request = urllib.request.Request(url + (f"?since={since}" if since else ""))
+            if token_file.exists():
+                request.add_header("Authorization", "Bearer " + token_file.read_text().strip())
+            with urllib.request.urlopen(request, timeout=90) as r:  # ntfy sends a keepalive every 45 s
+                wait = 5
+                for line in r:
+                    m = json.loads(line)
+                    if m.get("event") == "message":
+                        since = m["id"]
+                        threading.Thread(target=show, args=(m,), daemon=True).start()
+        except Exception:
+            time.sleep(wait)
+            wait = min(wait * 2, 300)
+
+
+if __name__ == "__main__":
+    main()

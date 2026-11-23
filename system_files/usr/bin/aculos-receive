@@ -1,0 +1,11 @@
+#!/bin/bash
+# aculos-receive: receives the files sent to this device with Taildrop and puts them in the folder set in
+# ~/.config/aculos/receive.conf (FOLDER=..., default ~/Downloads). Runs as aculos-receive.service.
+# Needed once: sudo tailscale set --operator=$USER
+set -euo pipefail
+conf="${XDG_CONFIG_HOME:-$HOME/.config}/aculos/receive.conf"
+FOLDER="$HOME/Downloads"
+# shellcheck source=/dev/null
+[ -r "$conf" ] && . "$conf"
+mkdir -p "$FOLDER"
+exec tailscale file get --loop --conflict=rename "$FOLDER"
