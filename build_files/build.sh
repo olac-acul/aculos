@@ -150,7 +150,7 @@ systemctl disable getty@tty1.service || true
 mkdir -p /usr/share/aculos
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
     noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd syncthing \
-    firefox chromium librewolf codium MarkFlowy starship > /usr/share/aculos/versioni.txt
+    firefox chromium librewolf codium mark-flowy starship > /usr/share/aculos/versioni.txt
 cat /usr/share/aculos/versioni.txt
 
 ### Pulizia: niente resti in /run e /var (bootc container lint)
