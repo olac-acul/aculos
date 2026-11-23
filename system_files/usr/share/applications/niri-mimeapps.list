@@ -1,0 +1,4 @@
+# aculOs defaults for the niri session. Your own choices in ~/.config/mimeapps.list win over these.
+# Without this, folders open in the first application that claims them (a code editor) instead of the file manager.
+[Default Applications]
+inode/directory=org.gnome.Nautilus.desktop

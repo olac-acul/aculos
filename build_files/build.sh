@@ -84,6 +84,14 @@ rm -f /tmp/markflowy.rpm
 ### File di sistema del repo (system_files/) copiati in /, dopo i pacchetti così prevalgono sui loro default
 cp -avf "/ctx/system_files"/. /
 
+### SELinux: la cartella di stato di noctalia-greeter con l'etichetta dei display manager
+# Il pacchetto non porta regole SELinux: la cartella prenderebbe var_lib_t e il greeter (dominio xdm_t) non
+# potrebbe sostituire i propri file (AVC "unlink" su sync.toml, visto in VM il 23/11). Stessa etichetta di
+# /var/lib/greetd. Sul sistema la applica tmpfiles (riga "Z" in noctalia-greeter.conf).
+semanage fcontext -a -N -t xdm_var_lib_t '/var/lib/noctalia-greeter(/.*)?'
+grep -q 'noctalia-greeter.*xdm_var_lib_t' /etc/selinux/targeted/contexts/files/file_contexts.local
+matchpathcon /var/lib/noctalia-greeter /var/lib/noctalia-greeter/sync.toml || true
+
 ### Impronta digitale: il modo standard di Fedora (authselect), con due eccezioni
 # L'impronta vale per tutto ciò che usa system-auth (sudo, su, polkit). Il greeter e il servizio PAM "login"
 # (la password del blocco schermo di Noctalia) usano invece password-auth, che authselect lascia senza
@@ -142,6 +150,10 @@ systemctl enable aculos-impronta-coperchio.service
 systemctl enable aculos-flathub.service aculos-flatpak-update.timer
 # Servizi utente: partono solo se l'utente ha la loro configurazione in ~/.config/aculos (vedi le unità)
 systemctl --global enable syncthing.service aculos-ntfy.service aculos-receive.service
+# Il timer utente di GRUB "boot riuscito" qui non serve e fallisce a ogni sessione: la configurazione statica di
+# bootupd non usa boot_success, e /boot è montato in sola lettura (visto in VM il 23/11).
+systemctl --global disable grub-boot-success.timer
+systemctl --global mask grub-boot-success.timer
 systemctl set-default graphical.target
 # Il login grafico è greetd su tty1: niente getty sullo stesso terminale
 systemctl disable getty@tty1.service || true
