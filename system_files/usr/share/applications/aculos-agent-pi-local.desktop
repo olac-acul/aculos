@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=pi · local model
+Comment=pi in a box, with the model the local server runs now
+Exec=kitty --title "pi · local model" aculos-agent pick --local pi
+Icon=utilities-terminal
+Categories=Development;
+Keywords=agent;ai;box;pi-local;

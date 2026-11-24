@@ -1,0 +1,8 @@
+# The agents agent-box does not bring: Codex and Claude Code, on top of its image (built by aculos-agent).
+# Versions are the latest at build time; "aculos-agent build --fresh" builds again, to update them.
+ARG BASE
+FROM ${BASE}
+ARG CODEX_VERSION=latest
+ARG CLAUDE_CODE_VERSION=latest
+RUN npm install -g "@openai/codex@${CODEX_VERSION}" "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+ && codex --version && claude --version && npm cache clean --force

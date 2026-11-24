@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Claude Code
+Comment=Coding agent in a box, on a project folder
+Exec=kitty --title "Claude Code" aculos-agent pick claude
+Icon=utilities-terminal
+Categories=Development;
+Keywords=agent;ai;box;claude;

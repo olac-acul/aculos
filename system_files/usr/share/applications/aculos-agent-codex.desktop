@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Codex
+Comment=Coding agent in a box, on a project folder
+Exec=kitty --title "Codex" aculos-agent pick codex
+Icon=utilities-terminal
+Categories=Development;
+Keywords=agent;ai;box;codex;

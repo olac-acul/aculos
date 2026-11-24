@@ -1,0 +1,2 @@
+; aculOs: /usr is read-only, so "npm install -g" installs into the home (~/.npm/bin is already in the PATH)
+prefix=${HOME}/.npm

@@ -1,0 +1,359 @@
+#!/usr/bin/python3 -I
+"""aculos-agent: run a coding agent in a box (agent-box), on the current folder.
+
+The agent sees only the folder you start it from, and every connection it opens must be approved in an OpenSnitch
+popup. Only the local model server, if you have one, goes through without asking.
+
+Usage:
+  aculos-agent [--local] [AGENT] [ARGS...]   AGENT: pi (default), codex, claude, opencode, bash (a shell in the box)
+                                             --local: pi with the model the local server serves now
+  aculos-agent pick [--local] [AGENT]        choose a project folder first (for the menu): one of ~/Projects, or a
+                                             new name to create it there
+  aculos-agent build [--fresh]               build the images (--fresh: from scratch, to update system and agents)
+  aculos-agent stop                          close the popup interface
+  aculos-agent status                        images, local model server, agents' folders
+
+Settings (all optional) in ~/.config/aculos/agents.toml:
+
+  [model]                  # OpenAI-compatible server with a local model; reached through a forward on 127.0.0.1
+  host = "192.0.2.10"
+  ports = [8000]           # tried in order
+  forward_port = 18000
+
+  projects = "~/Projects"  # where "pick" looks for project folders
+
+  [[mount]]                # files of your home the box may read: they appear under /run/host/
+  path = "~/.gitconfig"
+  env = "GIT_CONFIG_GLOBAL"    # optional: variable that gets the path in the box
+
+What the agents keep (logins, sessions, settings) is in ~/.local/share/aculos/agents/<agent>, the only other
+folder of yours they see. Rules for all the agents: ~/.config/aculos/AGENTS.md is added to the ones of the distro.
+"""
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import tomllib
+import urllib.request
+
+UPSTREAM = "/usr/lib/agent-box"                      # morrolinux/agent-box at the commit pinned in the image
+SHARE = "/usr/share/aculos/agents"                   # Containerfile and AGENTS.md of the distro
+CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+DATA_HOME = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+CONFIG = os.path.join(CONFIG_HOME, "aculos", "agents.toml")
+USER_RULES = os.path.join(CONFIG_HOME, "aculos", "AGENTS.md")
+STATE = os.path.join(DATA_HOME, "aculos", "agents")  # mounted in the box as BOX_STATE
+BOX_HOME = "/home/agent"
+BOX_STATE = BOX_HOME + "/.aculos"
+BOX_FILES = "/run/host"
+BOX_MODEL_HOST = "169.254.1.3"                       # the host's 127.0.0.1 seen from the box (compose.yaml)
+SYSTEM_DIRS = ("/", "/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/lib64", "/media", "/mnt", "/opt", "/proc",
+               "/root", "/run", "/sbin", "/srv", "/sys", "/tmp", "/usr", "/var", "/var/home")
+SYSTEM_TREES = ("/boot/", "/dev/", "/etc/", "/proc/", "/run/", "/sys/", "/usr/")
+
+# agent: (command in the box, folder under STATE, file with the rules for every project, environment)
+AGENTS = {
+    "pi": (["/usr/local/bin/pi"], "pi", "AGENTS.md", {
+        "PI_CODING_AGENT_DIR": BOX_STATE + "/pi", "PI_OFFLINE": "1", "PI_SKIP_VERSION_CHECK": "1", "PI_TELEMETRY": "0"}),
+    "codex": (["codex"], "codex", "AGENTS.md", {"CODEX_HOME": BOX_STATE + "/codex"}),
+    "claude": (["claude"], "claude", "CLAUDE.md", {
+        "CLAUDE_CONFIG_DIR": BOX_STATE + "/claude", "DISABLE_AUTOUPDATER": "1"}),
+    "opencode": (["opencode"], None, None, {}),
+    "bash": (["bash"], None, None, {}),
+}
+
+
+def die(message):
+    print(f"aculos-agent: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def note(message):
+    print(f"aculos-agent: {message}", file=sys.stderr)
+
+
+def settings():
+    try:
+        with open(CONFIG, "rb") as f:
+            return tomllib.load(f)
+    except FileNotFoundError:
+        return {}
+    except tomllib.TOMLDecodeError as e:
+        die(f"{CONFIG}: {e}")
+
+
+def commit():
+    with open(os.path.join(UPSTREAM, "COMMIT")) as f:
+        return f.read().strip()[:12]
+
+
+def images():
+    tag = commit()
+    return {"box": f"localhost/agent-box:{tag}", "ui": f"localhost/agent-box-ui:{tag}",
+            "agents": f"localhost/aculos-agents:{tag}"}
+
+
+def image_exists(name):
+    return subprocess.run(["podman", "image", "exists", name]).returncode == 0
+
+
+def build(fresh=False):
+    names = images()
+    extra = ["--no-cache", "--pull=always"] if fresh else []
+    steps = [
+        ("the box (Fedora, OpenSnitch, pi, OpenCode)", names["box"],
+         ["podman", "build", *extra, "--target", "agent", "-t", names["box"], UPSTREAM]),
+        ("the popup interface", names["ui"],
+         ["podman", "build", *extra, "--target", "ui", "-t", names["ui"], UPSTREAM]),
+        ("Codex and Claude Code", names["agents"],
+         ["podman", "build", *(["--no-cache"] if fresh else []), "--build-arg", f"BASE={names['box']}",
+          "-t", names["agents"], "-f", os.path.join(SHARE, "Containerfile"), SHARE]),
+    ]
+    for what, name, command in steps:
+        if not fresh and image_exists(name):
+            continue
+        note(f"building {what}: {name} (a few minutes, only the first time)")
+        if subprocess.run(command).returncode != 0:
+            die(f"could not build {name}")
+
+
+def check_folder():
+    """Like upstream's agent-box: the folder is shown whole to the agent and relabelled for SELinux."""
+    real = os.path.realpath(os.getcwd())
+    home = os.path.realpath(os.path.expanduser("~"))
+
+    def refuse(why):
+        die(f"refusing to mount {real}: {why}. cd into a project folder.")
+    if real in SYSTEM_DIRS:
+        refuse("system directory")
+    if real.startswith(SYSTEM_TREES):
+        refuse("inside a system directory")
+    if real == home:
+        refuse("it's your home")
+    if (home + "/").startswith(real + "/"):
+        refuse("it contains your home")
+    if real.startswith(home + "/."):
+        refuse("it's inside a hidden folder of your home")
+    if os.stat(real).st_uid != os.getuid():
+        refuse("it isn't owned by you")
+    return os.environ.get("PWD") if os.path.realpath(os.environ.get("PWD", "")) == real else real
+
+
+def local_model(conf):
+    """(port, model id, context) of the local model server, or None."""
+    model = conf.get("model") or {}
+    host = model.get("host")
+    if not host:
+        return None
+    for port in model.get("ports") or [8000]:
+        try:
+            with urllib.request.urlopen(f"http://{host}:{port}/v1/models", timeout=5) as r:
+                data = json.load(r).get("data") or []
+        except (OSError, ValueError):
+            continue
+        if data:
+            first = data[0]
+            context = first.get("context_length") or (first.get("meta") or {}).get("n_ctx") or 65536
+            return port, first["id"], int(context)
+    return None
+
+
+def start_forward(conf, port):
+    """127.0.0.1:forward_port -> the model server, for as long as the box runs."""
+    model = conf["model"]
+    listen = int(model.get("forward_port", 18000))
+    with socket.socket() as s:
+        if s.connect_ex(("127.0.0.1", listen)) == 0:
+            die(f"port {listen} on 127.0.0.1 is already in use (another box? change forward_port in {CONFIG})")
+    forward = subprocess.Popen(["socat", f"TCP-LISTEN:{listen},bind=127.0.0.1,fork,reuseaddr",
+                                f"TCP:{model['host']}:{port}"], stdin=subprocess.DEVNULL)
+    return listen, forward
+
+
+def write_rules(folder, filename):
+    """Rules for every project: the distro's, then the user's. Written again at each start."""
+    parts = []
+    for path in (os.path.join(SHARE, "AGENTS.md"), USER_RULES):
+        try:
+            with open(path) as f:
+                parts.append(f.read().strip())
+        except FileNotFoundError:
+            pass
+    with open(os.path.join(folder, filename), "w") as f:
+        f.write("\n\n".join(parts) + "\n")
+
+
+def pi_local_provider(folder, port, model_id, context):
+    """Make pi know the local model: provider "local" in its models.json, the rest of the file as it is."""
+    path = os.path.join(folder, "models.json")
+    try:
+        with open(path) as f:
+            conf = json.load(f)
+    except FileNotFoundError:
+        conf = {}
+    except ValueError as e:
+        die(f"{path}: {e}")
+    provider = conf.setdefault("providers", {}).setdefault("local", {})
+    provider.update({"name": "Local model", "baseUrl": f"http://{BOX_MODEL_HOST}:{port}/v1",
+                     "api": "openai-completions", "apiKey": "local"})
+    known = {m.get("id"): m for m in provider.setdefault("models", [])}
+    entry = known.get(model_id)
+    if entry is None:
+        entry = {"id": model_id, "name": f"{model_id} (local)", "reasoning": True, "maxTokens": 16384}
+        provider["models"].append(entry)
+    entry["contextWindow"] = context
+    with open(path + ".new", "w") as f:
+        json.dump(conf, f, indent=2)
+        f.write("\n")
+    os.replace(path + ".new", path)
+
+
+def quote(text):
+    return json.dumps(str(text))    # a JSON string is a YAML string
+
+
+def override(conf, agent_env, names):
+    """Compose file laid over upstream's: our images, the agents' folder, the files the box may read."""
+    volumes = [f"{STATE}:{BOX_STATE}:z"]
+    env = dict(agent_env, TERM="xterm-256color", COLORTERM="truecolor")
+    for mount in conf.get("mount") or []:
+        path = os.path.expanduser(mount.get("path", ""))
+        if not os.path.isfile(path):
+            note(f"{mount.get('path')}: not a file, left out of the box")
+            continue
+        target = f"{BOX_FILES}/{os.path.basename(path)}"
+        volumes.append(f"{path}:{target}:ro,z")
+        if mount.get("env"):
+            env[mount["env"]] = target
+    lines = ["services:", "  ui:", f"    image: {quote(names['ui'])}", "  agent:",
+             f"    image: {quote(names['agents'])}", "    environment:"]
+    lines += [f"      {key}: {quote(value)}" for key, value in env.items()]
+    lines += ["    volumes:"] + [f"      - {quote(v)}" for v in volumes]
+    folder = os.path.join(os.environ["XDG_RUNTIME_DIR"], "aculos-agent")
+    os.makedirs(folder, mode=0o700, exist_ok=True)
+    path = os.path.join(folder, "compose.override.yaml")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return path
+
+
+def compose(*args):
+    return ["podman-compose", "-f", os.path.join(UPSTREAM, "compose.yaml"), *args]
+
+
+def run(argv):
+    use_local = False
+    if argv and argv[0] == "--local":
+        use_local, argv = True, argv[1:]
+    name = argv[0] if argv and argv[0] in AGENTS else "pi"
+    rest = argv[1:] if argv and argv[0] in AGENTS else argv
+    command, folder, rules, agent_env = AGENTS[name]
+    if use_local and name != "pi":
+        die("--local is for pi (opencode always uses the local model)")
+    pwd = check_folder()
+    if not shutil.which("podman-compose"):
+        die("podman-compose not found")
+    display = os.environ.get("WAYLAND_DISPLAY")
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if not (display and runtime and os.path.exists(os.path.join(runtime, display))):
+        die("no Wayland session (the approval popups need one)")
+    conf = settings()
+    build()
+    names = images()
+
+    os.makedirs(STATE, mode=0o700, exist_ok=True)
+    if folder:
+        os.makedirs(os.path.join(STATE, folder), exist_ok=True)
+        write_rules(os.path.join(STATE, folder), rules)
+
+    env = dict(os.environ, PWD=pwd)
+    forward = None
+    found = local_model(conf)
+    if found:
+        port, model_id, context = found
+        listen, forward = start_forward(conf, port)
+        env.update(MODEL_PORT=str(listen), MODEL_ID=model_id, MODEL_CONTEXT=str(context))
+        if name == "pi":
+            pi_local_provider(os.path.join(STATE, "pi"), listen, model_id, context)
+        if use_local:
+            command = command + ["--provider", "local", "--model", model_id]
+    elif use_local or name == "opencode":
+        die(f"no local model server answers (see [model] in {CONFIG})")
+    try:
+        cmd = compose("-f", override(conf, agent_env, names), "run", "--rm", "agent", *command, *rest)
+        return subprocess.run(cmd, env=env, cwd=os.path.realpath(pwd)).returncode
+    except KeyboardInterrupt:
+        return 130
+    finally:
+        if forward:
+            forward.terminate()
+
+
+def pick(argv):
+    """Choose a project folder with fzf, then run the agent there. Keeps the terminal open on errors."""
+    root = os.path.expanduser(settings().get("projects", "~/Projects"))
+    os.makedirs(root, exist_ok=True)
+    names = sorted(e.name for e in os.scandir(root) if e.is_dir() and not e.name.startswith("."))
+    chosen = subprocess.run(
+        ["fzf", "--print-query", "--prompt", "project> ", "--height", "100%", "--layout", "reverse",
+         "--header", f"Folder in {root} (type a new name to create it)"],
+        input="\n".join(names), text=True, stdout=subprocess.PIPE)
+    if chosen.returncode not in (0, 1):     # 130: Esc or Ctrl+C
+        return 0
+    lines = chosen.stdout.splitlines()
+    name = (lines[1] if len(lines) > 1 else lines[0] if lines else "").strip()
+    if not name or "/" in name or name.startswith("."):
+        die("no folder chosen")
+    folder = os.path.join(root, name)
+    os.makedirs(folder, exist_ok=True)
+    os.chdir(folder)
+    os.environ["PWD"] = folder
+    code = run(argv)
+    if code not in (0, 130):
+        input("aculos-agent: the box ended with an error. Press Enter to close. ")
+    return code
+
+
+def stop():
+    return subprocess.run(compose("down"), env=dict(os.environ, PWD=UPSTREAM)).returncode
+
+
+def status():
+    for what, name in images().items():
+        print(f"image {what:7} {name}: {'built' if image_exists(name) else 'not built (aculos-agent build)'}")
+    conf = settings()
+    found = local_model(conf)
+    if found:
+        print(f"local model   {found[1]} on port {found[0]}, context {found[2]}")
+    else:
+        print("local model   " + ("the server does not answer" if (conf.get("model") or {}).get("host")
+                                  else f"none set ([model] in {CONFIG})"))
+    print(f"agents' data  {STATE}")
+    return 0
+
+
+def main():
+    argv = sys.argv[1:]
+    if argv and argv[0] in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    if argv and argv[0] == "pick":
+        try:
+            return pick(argv[1:])
+        except SystemExit as e:
+            if e.code:
+                input("Press Enter to close. ")
+            raise
+    if argv and argv[0] == "build":
+        build(fresh="--fresh" in argv[1:])
+        return 0
+    if argv and argv[0] == "stop":
+        return stop()
+    if argv and argv[0] == "status":
+        return status()
+    return run(argv)
+
+
+sys.exit(main())

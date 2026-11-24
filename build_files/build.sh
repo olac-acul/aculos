@@ -50,7 +50,7 @@ dnf5 -y install \
     rsync pv socat wget2-wget unzip 7zip unrar \
     chezmoi nodejs nodejs-npm \
     igt-gpu-tools ethtool \
-    flatpak distrobox podman \
+    flatpak distrobox podman podman-compose \
     firefox chromium
 
 # Fase 5: schermi esterni. kanshi riapplica la disposizione salvata per ogni combinazione di schermi (i profili
@@ -112,6 +112,21 @@ ln -sf /usr/lib/Bitwarden/bitwarden /usr/bin/bitwarden
 chmod 0755 /usr/lib/Bitwarden/chrome-sandbox
 sed -i 's|^Exec=/opt/Bitwarden/bitwarden|Exec=/usr/bin/bitwarden|' /usr/share/applications/bitwarden.desktop
 grep -q '^Exec=/usr/bin/bitwarden' /usr/share/applications/bitwarden.desktop
+
+### agent-box: coding agents in a Podman box where every outgoing connection needs an approval (OpenSnitch popup)
+# https://github.com/morrolinux/agent-box (MIT). Its images on ghcr.io are not public, so they are built on the
+# machine, from these files, by aculos-agent. Pinned to a commit: to update, change the two lines (sha256 of the
+# archive GitHub serves for that commit) and check what changed in compose.yaml and entrypoint.sh.
+AGENT_BOX_COMMIT=39d3cb6700cc4ca45ef741d0f6154d7a46c80807
+AGENT_BOX_SHA256=c17628792730d59e9e1529ad9cba636fe59bcbc33832a22f2bc3233a08302b43
+curl -fsSL -o /tmp/agent-box.tar.gz "https://github.com/morrolinux/agent-box/archive/${AGENT_BOX_COMMIT}.tar.gz"
+echo "${AGENT_BOX_SHA256}  /tmp/agent-box.tar.gz" | sha256sum -c -
+mkdir -p /usr/lib/agent-box
+tar -xzf /tmp/agent-box.tar.gz -C /usr/lib/agent-box --strip-components=1
+rm -f /tmp/agent-box.tar.gz
+rm -rf /usr/lib/agent-box/.github
+echo "${AGENT_BOX_COMMIT}" > /usr/lib/agent-box/COMMIT
+test -f /usr/lib/agent-box/compose.yaml -a -f /usr/lib/agent-box/Containerfile
 
 ### File di sistema del repo (system_files/) copiati in /, dopo i pacchetti così prevalgono sui loro default
 cp -avf "/ctx/system_files"/. /
