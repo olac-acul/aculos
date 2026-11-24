@@ -275,6 +275,11 @@ layout {
 // aculOs: Noctalia parte come servizio utente systemd (noctalia.service, legato a niri.service),
 // quindi qui non serve spawn-at-startup.
 
+// aculOs: al primo accesso di un account nuovo (finché non ci sono i dotfiles) apre il terminale con aculos-setup.
+// Non fa nulla se la configurazione è già stata fatta o rifiutata. Questa configurazione vale solo finché l'utente
+// non ne ha una sua in ~/.config/niri.
+spawn-sh-at-startup "aculos-setup --welcome"
+
 // To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
 

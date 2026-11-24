@@ -1,0 +1,113 @@
+#!/bin/bash
+# aculos-setup: first-login setup of a new aculOs machine, step by step. Every step is skipped when already done,
+# so it can be run again after an interruption.
+#   1. network: if the password vault is not reachable, offer to join a Tailscale/Headscale network;
+#   2. Keyguard (Flatpak): install it, then wait until you log in and turn on its SSH agent;
+#   3. Bitwarden CLI (bw): point it at the vault and log in;
+#   4. dotfiles: chezmoi init --apply from your repository, cloned over SSH with the key served by Keyguard;
+#   5. Flatpak apps listed by the dotfiles (aculos-flatpak);
+#   6. what is left to do by hand.
+# Nothing personal is built in: addresses are asked once and kept in ~/.local/state/aculos/setup.env.
+#
+# Usage: aculos-setup             run the setup
+#        aculos-setup --welcome   at login: open it in a terminal, unless already done or declined
+set -uo pipefail
+
+state="${XDG_STATE_HOME:-$HOME/.local/state}/aculos"
+answers="$state/setup.env"
+done_stamp="$state/setup-done"
+keyguard=com.artemchep.keyguard
+agent="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/app/$keyguard/ssh-agent.sock"
+
+if [ "${1:-}" = "--welcome" ]; then
+    [ -e "$done_stamp" ] || [ -d "${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi" ] && exit 0
+    exec kitty --title "aculOs setup" aculos-setup
+fi
+
+bold=$'\e[1m'; dim=$'\e[2m'; off=$'\e[0m'
+step() { printf '\n%s== %s%s\n' "$bold" "$*" "$off"; }
+note() { printf '%s%s%s\n' "$dim" "$*" "$off"; }
+ask() {   # ask VAR "question" [default]
+    local reply
+    read -r -p "$2${3:+ [$3]}: " reply
+    printf -v "$1" '%s' "${reply:-${3:-}}"
+}
+yes_no() { local r; read -r -p "$1 [y/N] " r; [[ $r == [yY]* ]]; }
+remember() { mkdir -p "$state"; grep -v "^$1=" "$answers" 2>/dev/null >"$answers.new"; printf '%s=%q\n' "$1" "$2" >>"$answers.new"; mv "$answers.new" "$answers"; }
+
+# shellcheck disable=SC1090
+[ -r "$answers" ] && . "$answers"
+VAULT_URL="${VAULT_URL:-}"; DOTFILES_REPO="${DOTFILES_REPO:-}"; HEADSCALE_URL="${HEADSCALE_URL:-}"
+
+printf '%sWelcome to aculOs.%s This sets up your account: password vault, SSH keys, dotfiles and apps.\n' "$bold" "$off"
+note "Each step is skipped when already done; you can stop with Ctrl+C and run aculos-setup again later."
+if ! yes_no "Start now?"; then
+    if yes_no "Do not ask again at login?"; then mkdir -p "$state"; touch "$done_stamp"; fi
+    exit 0
+fi
+
+step "1. Network and password vault"
+[ -n "$VAULT_URL" ] || { ask VAULT_URL "Vaultwarden/Bitwarden server URL (e.g. https://vault.example.org)"; remember VAULT_URL "$VAULT_URL"; }
+until curl -fsS -m 5 -o /dev/null "$VAULT_URL/alive" 2>/dev/null || curl -fsS -m 5 -o /dev/null "$VAULT_URL" 2>/dev/null; do
+    echo "The vault at $VAULT_URL is not reachable from here."
+    if tailscale status >/dev/null 2>&1; then
+        note "Tailscale is already connected: check the address, or the network you are on."
+    elif yes_no "Join a Tailscale/Headscale network now?"; then
+        [ -n "$HEADSCALE_URL" ] || { ask HEADSCALE_URL "Login server (empty for tailscale.com)"; remember HEADSCALE_URL "$HEADSCALE_URL"; }
+        sudo tailscale up --accept-routes --operator="$USER" ${HEADSCALE_URL:+--login-server="$HEADSCALE_URL"}
+        continue
+    fi
+    yes_no "Try again?" || exit 1
+done
+echo "Vault reachable."
+
+step "2. Keyguard and its SSH agent"
+if ! flatpak info "$keyguard" >/dev/null 2>&1; then
+    flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+    flatpak install --system -y flathub "$keyguard" || { echo "Keyguard was not installed."; exit 1; }
+fi
+until [ -S "$agent" ] && SSH_AUTH_SOCK="$agent" ssh-add -l >/dev/null 2>&1; do
+    pgrep -f "$keyguard" >/dev/null || (flatpak run "$keyguard" >/dev/null 2>&1 &)
+    echo "In the Keyguard window: add your account (server: $VAULT_URL) and log in,"
+    echo "then turn on Settings > Developer > Enable SSH agent."
+    read -r -p "Press Enter when done... " _
+done
+echo "Keys served by Keyguard:"; SSH_AUTH_SOCK="$agent" ssh-add -l
+
+step "3. Bitwarden CLI"
+if [ "$(bw status 2>/dev/null | jq -r .status)" = "unauthenticated" ]; then
+    bw config server "$VAULT_URL" >/dev/null
+    until bw login; do yes_no "Login failed. Try again?" || exit 1; done
+else
+    echo "bw is already logged in."
+fi
+
+step "4. Dotfiles (chezmoi)"
+if [ -d "$(chezmoi source-path 2>/dev/null)" ]; then
+    echo "Dotfiles already initialized: updating."
+    chezmoi update
+else
+    [ -n "$DOTFILES_REPO" ] || { ask DOTFILES_REPO "Dotfiles repository (git URL, e.g. git@host:user/dotfiles.git)"; remember DOTFILES_REPO "$DOTFILES_REPO"; }
+    note "The first SSH connection to the repository host asks you to confirm its key."
+    note "chezmoi asks for the vault master password to read the secrets, sudo for system files, and Keyguard"
+    note "asks you to approve each signature with an SSH key."
+    until SSH_AUTH_SOCK="$agent" chezmoi init --apply "$DOTFILES_REPO"; do
+        yes_no "chezmoi failed. Try again?" || exit 1
+    done
+fi
+
+step "5. Flatpak apps"
+if [ -r "${XDG_CONFIG_HOME:-$HOME/.config}/aculos/flatpak.list" ]; then
+    aculos-flatpak || note "Some apps were not installed: run aculos-flatpak again later."
+else
+    note "No ~/.config/aculos/flatpak.list in the dotfiles: nothing to install."
+fi
+
+mkdir -p "$state"; touch "$done_stamp"
+step "Done. Left to do by hand"
+cat <<'EOF'
+- Log out and back in, so that the session uses the configuration that just arrived.
+- In Firefox and LibreWolf, install the Pywalfox extension (addons.mozilla.org) so they follow the theme.
+- Anything listed under "by hand" in your dotfiles' README (Wi-Fi zones, Tailscale, ...).
+EOF
+read -r -p "Press Enter to close. " _
