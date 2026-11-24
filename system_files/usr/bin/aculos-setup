@@ -107,7 +107,8 @@ mkdir -p "$state"; touch "$done_stamp"
 step "Done. Left to do by hand"
 cat <<'EOF'
 - Log out and back in, so that the session uses the configuration that just arrived.
-- In Firefox and LibreWolf, install the Pywalfox extension (addons.mozilla.org) so they follow the theme.
+- Browser extensions install themselves on first start (Pywalfox and Bitwarden in Firefox and LibreWolf,
+  Bitwarden in Chromium): just log in to Bitwarden in each browser.
 - Anything listed under "by hand" in your dotfiles' README (Wi-Fi zones, Tailscale, ...).
 EOF
 read -r -p "Press Enter to close. " _
