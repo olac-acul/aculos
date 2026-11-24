@@ -84,7 +84,8 @@ if ! flatpak info "$keyguard" >/dev/null 2>&1; then
     flatpak install --system -y flathub "$keyguard" || { echo "Keyguard was not installed."; exit 1; }
 fi
 until [ -S "$agent" ] && SSH_AUTH_SOCK="$agent" ssh-add -l >/dev/null 2>&1; do
-    pgrep -f "$keyguard" >/dev/null || (flatpak run "$keyguard" >/dev/null 2>&1 &)
+    # in its own session: closing this terminal must not close Keyguard (and its SSH agent) too
+    pgrep -f "$keyguard" >/dev/null || setsid -f flatpak run "$keyguard" </dev/null >/dev/null 2>&1
     echo "In the Keyguard window: add your account (server: $VAULT_URL) and log in,"
     echo "then turn on Settings > Developer > Enable SSH agent."
     read -r -p "Press Enter when done... " _
