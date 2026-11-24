@@ -8,4 +8,11 @@ FOLDER="$HOME/Downloads"
 # shellcheck source=/dev/null
 [ -r "$conf" ] && . "$conf"
 mkdir -p "$FOLDER"
+# Without the operator right "tailscale file get --loop" logs "Access denied" every 5 seconds, forever: check once and
+# stop with one clear message (exit 3: the unit does not restart for it).
+if ! out=$(tailscale file get --conflict=rename "$FOLDER" 2>&1) && grep -qi "access denied" <<<"$out"; then
+    echo "aculos-receive: $USER is not the Tailscale operator. Once: sudo tailscale set --operator=\$USER," >&2
+    echo "then: systemctl --user restart aculos-receive" >&2
+    exit 3
+fi
 exec tailscale file get --loop --conflict=rename "$FOLDER"

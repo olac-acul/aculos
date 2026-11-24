@@ -6,6 +6,8 @@ ConditionPathExists=%h/.config/aculos/receive.conf
 ExecStart=/usr/bin/aculos-receive
 Restart=always
 RestartSec=10
+# 3: not the Tailscale operator (see aculos-receive), retrying does not help
+RestartPreventExitStatus=3
 
 [Install]
 WantedBy=default.target
