@@ -100,7 +100,8 @@ else
 fi
 
 step "4. Dotfiles (chezmoi)"
-if [ -d "$(chezmoi source-path 2>/dev/null)" ]; then
+# a clone, not just the folder: "chezmoi git" and others create it empty
+if [ -d "$(chezmoi source-path 2>/dev/null)/.git" ]; then
     echo "Dotfiles already initialized: updating."
     chezmoi update
 else
