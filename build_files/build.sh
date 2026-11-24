@@ -148,6 +148,32 @@ systemctl --global enable noctalia.service
 mkdir -p /etc/niri
 ln -sf /usr/share/aculos/niri/config.kdl /etc/niri/config.kdl
 
+### Estensioni dei browser, installate da sole (l'utente può disattivarle, non toglierle): Pywalfox (colori dei temi
+# di Noctalia, che le fa da host) e Bitwarden (gestore di password, per Vaultwarden). Non in Tor e Mullvad Browser.
+# Firefox legge /etc/firefox/policies; per LibreWolf le voci si aggiungono alle sue regole, senza toccare le altre.
+python3 -I - <<'PY'
+import json, os
+amo = "https://addons.mozilla.org/firefox/downloads/latest/{}/latest.xpi"
+estensioni = {
+    "pywalfox@frewacom.org": {"installation_mode": "normal_installed", "install_url": amo.format("pywalfox")},
+    "{446900e4-71c2-419f-a6a7-df9c091e268b}": {"installation_mode": "normal_installed",
+                                               "install_url": amo.format("bitwarden-password-manager")},
+}
+os.makedirs("/etc/firefox/policies", exist_ok=True)
+json.dump({"policies": {"ExtensionSettings": estensioni}}, open("/etc/firefox/policies/policies.json", "w"), indent=2)
+p = "/usr/share/librewolf/distribution/policies.json"
+d = json.load(open(p))
+d["policies"].setdefault("ExtensionSettings", {}).update(estensioni)
+json.dump(d, open(p, "w"), indent=2)
+os.makedirs("/etc/chromium/policies/managed", exist_ok=True)
+json.dump({"ExtensionSettings": {"nngceckbapebfimnlniiiahkandclblb": {   # Bitwarden dal Chrome Web Store
+    "installation_mode": "normal_installed", "update_url": "https://clients2.google.com/service/update2/crx"}}},
+    open("/etc/chromium/policies/managed/aculos-estensioni.json", "w"), indent=2)
+PY
+grep -q pywalfox /etc/firefox/policies/policies.json
+grep -q pywalfox /usr/share/librewolf/distribution/policies.json
+grep -q uBlock0 /usr/share/librewolf/distribution/policies.json
+
 ### Chromium: i profili nuovi usano il tema GTK, così seguono i colori dei temi di Noctalia (che colora GTK).
 # Le preferenze iniziali sono un file del pacchetto chromium: si aggiunge solo la chiave, il resto resta di Fedora.
 python3 -I - <<'PY'
