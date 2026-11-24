@@ -125,7 +125,9 @@ cat <<'EOF'
   Bitwarden in Chromium): just log in to Bitwarden in each browser.
 - In Bitwarden desktop, Settings: "Keep Bitwarden running in the background" and "Start automatically on login",
   so that it (and the SSH agent) keeps running in the tray without a window; "Unlock with system authentication"
-  for the fingerprint.
+  for the fingerprint, with vault timeout action "Lock" and a timeout in minutes (not "On restart"): the key for
+  it lives only in memory, so after a login the first unlock always takes the master password. The browser
+  extensions unlock through the desktop app ("Unlock with biometrics" in the extension).
 - Anything listed under "by hand" in your dotfiles' README (Wi-Fi zones, Tailscale, ...).
 EOF
 read -r -p "Press Enter to close. " _
