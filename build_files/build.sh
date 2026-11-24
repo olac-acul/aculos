@@ -19,6 +19,9 @@ dnf5 -y install \
     polkit \
     kitty \
     tailscale
+# niri porta con sé, come dipendenze consigliate, i programmi della sua configurazione di esempio. In aculOs li
+# sostituiscono kitty (terminale) e Noctalia (barra, launcher, blocco schermo): via, così non compaiono nel menu.
+dnf5 -y remove alacritty fuzzel swaylock waybar
 
 # Fase 3: portatile. tuned-ppd al posto di power-profiles-daemon (stessa interfaccia D-Bus, che Noctalia usa);
 # intel-lpmd e thermald sono già nella base.
