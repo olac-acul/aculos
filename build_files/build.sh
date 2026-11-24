@@ -54,6 +54,10 @@ dnf5 -y install \
 # li scrive aculos-display), wl-mirror duplica uno schermo su un altro, wlr-randr serve per le diagnosi.
 dnf5 -y install kanshi wl-mirror wlr-randr
 
+# Fase 5: per i temi alternativi del desktop: font a celle Terminus in TrueType (famiglia "Terminus (TTF)")
+# e le icone Papirus (le cartelle colorate le ricava il comando dei temi, per l'utente)
+dnf5 -y install ax86-terminus-ttf-fonts papirus-icon-theme papirus-icon-theme-dark
+
 ### Pacchetti di Terra (Noctalia)
 # terra-release porta il file del repo e la chiave GPG; il repo resta installato ma spento,
 # e si accende solo per i pacchetti che servono.
@@ -166,7 +170,7 @@ systemctl disable getty@tty1.service || true
 mkdir -p /usr/share/aculos
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
     noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd syncthing \
-    firefox chromium librewolf codium mark-flowy starship kanshi wl-mirror > /usr/share/aculos/versioni.txt
+    firefox chromium librewolf codium mark-flowy starship kanshi wl-mirror ax86-terminus-ttf-fonts papirus-icon-theme > /usr/share/aculos/versioni.txt
 cat /usr/share/aculos/versioni.txt
 
 ### Pulizia: niente resti in /run e /var (bootc container lint)
