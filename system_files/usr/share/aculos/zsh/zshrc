@@ -81,6 +81,8 @@ add-zsh-hook precmd _aculos_cmd_done
 
 # --- fzf (Ctrl+R history, Ctrl+T files, Alt+C folders)
 [[ -r /usr/share/fzf/shell/key-bindings.zsh ]] && source /usr/share/fzf/shell/key-bindings.zsh
+# Colors from the Noctalia palette, when its "fzf" template is enabled
+[[ -r ${XDG_CONFIG_HOME:-$HOME/.config}/fzf/themes/noctalia.sh ]] && source ${XDG_CONFIG_HOME:-$HOME/.config}/fzf/themes/noctalia.sh
 
 # --- Prompt
 (( $+commands[starship] )) && eval "$(starship init zsh)"
