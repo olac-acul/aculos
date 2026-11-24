@@ -148,6 +148,17 @@ systemctl --global enable noctalia.service
 mkdir -p /etc/niri
 ln -sf /usr/share/aculos/niri/config.kdl /etc/niri/config.kdl
 
+### Chromium: i profili nuovi usano il tema GTK, così seguono i colori dei temi di Noctalia (che colora GTK).
+# Le preferenze iniziali sono un file del pacchetto chromium: si aggiunge solo la chiave, il resto resta di Fedora.
+python3 -I - <<'PY'
+import json
+p = "/etc/chromium/master_preferences"
+d = json.load(open(p))
+d.setdefault("extensions", {}).setdefault("theme", {})["system_theme"] = 1   # 1 = GTK
+json.dump(d, open(p, "w"), indent=2)
+PY
+grep -q '"system_theme": 1' /etc/chromium/master_preferences
+
 ### Shell: zsh per i nuovi utenti (lo .zshrc di /etc/skel carica i default di /usr/share/aculos/zsh)
 sed -i 's|^SHELL=.*|SHELL=/usr/bin/zsh|' /etc/default/useradd
 grep -q '^SHELL=/usr/bin/zsh$' /etc/default/useradd
