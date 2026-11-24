@@ -48,7 +48,7 @@ dnf5 -y install \
     zsh zsh-autosuggestions zsh-syntax-highlighting \
     eza bat ripgrep fd-find fzf jq btop duf plocate \
     rsync pv socat wget2-wget unzip 7zip unrar \
-    chezmoi nodejs nodejs-npm util-linux-user \
+    chezmoi nodejs nodejs-npm \
     igt-gpu-tools ethtool \
     flatpak distrobox podman \
     firefox chromium
