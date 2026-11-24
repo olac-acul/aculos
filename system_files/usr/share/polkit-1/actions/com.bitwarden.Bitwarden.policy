@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<!-- aculOs: the policy Bitwarden desktop would install itself with pkexec, which cannot write to /usr in a bootc
+     image. With it, Settings > "Unlock with system authentication" opens the vault through polkit, i.e. system-auth:
+     fingerprint, or the account password. -->
+<policyconfig>
+    <action id="com.bitwarden.Bitwarden.unlock">
+      <description>Unlock Bitwarden</description>
+      <message>Authenticate to unlock Bitwarden</message>
+      <defaults>
+        <allow_any>no</allow_any>
+        <allow_inactive>no</allow_inactive>
+        <allow_active>auth_self</allow_active>
+      </defaults>
+    </action>
+</policyconfig>

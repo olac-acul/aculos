@@ -2,9 +2,9 @@
 # aculos-setup: first-login setup of a new aculOs machine, step by step. Every step is skipped when already done,
 # so it can be run again after an interruption.
 #   1. network: if the password vault is not reachable, offer to join a Tailscale/Headscale network;
-#   2. Keyguard (Flatpak): install it, then wait until you log in and turn on its SSH agent;
+#   2. Bitwarden desktop (in the image): wait until you log in and turn on its SSH agent;
 #   3. Bitwarden CLI (bw): point it at the vault and log in;
-#   4. dotfiles: chezmoi init --apply from your repository, cloned over SSH with the key served by Keyguard;
+#   4. dotfiles: chezmoi init --apply from your repository, cloned over SSH with the key served by Bitwarden;
 #   5. Flatpak apps listed by the dotfiles (aculos-flatpak);
 #   6. what is left to do by hand.
 # Nothing personal is built in: addresses are asked once and kept in ~/.local/state/aculos/setup.env.
@@ -18,8 +18,7 @@ set -uo pipefail
 state="${XDG_STATE_HOME:-$HOME/.local/state}/aculos"
 answers="$state/setup.env"
 done_stamp="$state/setup-done"
-keyguard=com.artemchep.keyguard
-agent="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/app/$keyguard/ssh-agent.sock"
+agent="$HOME/.bitwarden-ssh-agent.sock"   # Bitwarden desktop's SSH agent
 
 default_wallpaper() {   # a fresh account has none: set a stock one, until a theme or the user picks another
     local current="" file
@@ -78,19 +77,15 @@ until curl -fsS -m 5 -o /dev/null "$VAULT_URL/alive" 2>/dev/null || curl -fsS -m
 done
 echo "Vault reachable."
 
-step "2. Keyguard and its SSH agent"
-if ! flatpak info "$keyguard" >/dev/null 2>&1; then
-    flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-    flatpak install --system -y flathub "$keyguard" || { echo "Keyguard was not installed."; exit 1; }
-fi
+step "2. Bitwarden and its SSH agent"
 until [ -S "$agent" ] && SSH_AUTH_SOCK="$agent" ssh-add -l >/dev/null 2>&1; do
-    # in its own session: closing this terminal must not close Keyguard (and its SSH agent) too
-    pgrep -f "$keyguard" >/dev/null || setsid -f flatpak run "$keyguard" </dev/null >/dev/null 2>&1
-    echo "In the Keyguard window: add your account (server: $VAULT_URL) and log in,"
-    echo "then turn on Settings > Developer > Enable SSH agent."
+    # in its own session: closing this terminal must not close Bitwarden (and its SSH agent) too
+    pgrep -f /usr/lib/Bitwarden/ >/dev/null || setsid -f bitwarden </dev/null >/dev/null 2>&1
+    echo "In the Bitwarden window: choose \"self-hosted\" as the server ($VAULT_URL) and log in,"
+    echo "then in Settings turn on \"Enable SSH agent\"."
     read -r -p "Press Enter when done... " _
 done
-echo "Keys served by Keyguard:"; SSH_AUTH_SOCK="$agent" ssh-add -l
+echo "Keys served by Bitwarden:"; SSH_AUTH_SOCK="$agent" ssh-add -l
 
 step "3. Bitwarden CLI"
 if [ "$(bw status 2>/dev/null | jq -r .status)" = "unauthenticated" ]; then
@@ -108,8 +103,8 @@ if [ -d "$(chezmoi source-path 2>/dev/null)/.git" ]; then
 else
     [ -n "$DOTFILES_REPO" ] || { ask DOTFILES_REPO "Dotfiles repository (git URL, e.g. git@host:user/dotfiles.git)"; remember DOTFILES_REPO "$DOTFILES_REPO"; }
     note "The first SSH connection to the repository host asks you to confirm its key."
-    note "chezmoi asks for the vault master password to read the secrets, sudo for system files, and Keyguard"
-    note "asks you to approve each signature with an SSH key."
+    note "chezmoi asks for the vault master password to read the secrets, sudo for system files, and Bitwarden"
+    note "asks you to authorize the use of an SSH key."
     until SSH_AUTH_SOCK="$agent" chezmoi init --apply "$DOTFILES_REPO"; do
         yes_no "chezmoi failed. Try again?" || exit 1
     done
@@ -128,6 +123,9 @@ cat <<'EOF'
 - Log out and back in, so that the session uses the configuration that just arrived.
 - Browser extensions install themselves on first start (Pywalfox and Bitwarden in Firefox and LibreWolf,
   Bitwarden in Chromium): just log in to Bitwarden in each browser.
+- In Bitwarden desktop, Settings: "Keep Bitwarden running in the background" and "Start automatically on login",
+  so that it (and the SSH agent) keeps running in the tray without a window; "Unlock with system authentication"
+  for the fingerprint.
 - Anything listed under "by hand" in your dotfiles' README (Wi-Fi zones, Tailscale, ...).
 EOF
 read -r -p "Press Enter to close. " _

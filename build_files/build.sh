@@ -92,6 +92,27 @@ echo "${MARKFLOWY_SHA256}  /tmp/markflowy.rpm" | sha256sum -c -
 dnf5 -y install /tmp/markflowy.rpm
 rm -f /tmp/markflowy.rpm
 
+### Bitwarden desktop, open source build ("oss-" assets, GPL-3.0; the Flathub one is the commercial "bit-" build):
+# password manager and SSH agent (keys from the vault). RPM from the GitHub releases, version and sha256 pinned.
+# To update: change the two lines (the sha256 is the "digest" field of oss-Bitwarden-<version>-x86_64.rpm).
+# The RPM installs into /opt, which in a bootc image is /var/opt and is only populated at the first install:
+# move it under /usr (tmpfiles links it back to /opt for paths written in the app).
+BITWARDEN_VERSION=2026.11.0
+BITWARDEN_SHA256=b30e042c8e90c23eab9ed8c7fe95632f11ea99ce874131856e987d9bb740f655
+curl -fsSL -o /tmp/bitwarden.rpm \
+    "https://github.com/bitwarden/clients/releases/download/desktop-v${BITWARDEN_VERSION}/oss-Bitwarden-${BITWARDEN_VERSION}-x86_64.rpm"
+echo "${BITWARDEN_SHA256}  /tmp/bitwarden.rpm" | sha256sum -c -
+mkdir -p /var/opt
+dnf5 -y install /tmp/bitwarden.rpm
+rm -f /tmp/bitwarden.rpm
+update-alternatives --remove bitwarden /opt/Bitwarden/bitwarden || true
+mv /opt/Bitwarden /usr/lib/Bitwarden
+ln -sf /usr/lib/Bitwarden/bitwarden /usr/bin/bitwarden
+# the RPM makes chrome-sandbox setuid when user namespaces fail, as they may in the build container: Fedora has them
+chmod 0755 /usr/lib/Bitwarden/chrome-sandbox
+sed -i 's|^Exec=/opt/Bitwarden/bitwarden|Exec=/usr/bin/bitwarden|' /usr/share/applications/bitwarden.desktop
+grep -q '^Exec=/usr/bin/bitwarden' /usr/share/applications/bitwarden.desktop
+
 ### File di sistema del repo (system_files/) copiati in /, dopo i pacchetti così prevalgono sui loro default
 cp -avf "/ctx/system_files"/. /
 
