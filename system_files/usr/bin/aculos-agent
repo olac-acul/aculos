@@ -22,6 +22,13 @@ Settings (all optional) in ~/.config/aculos/agents.toml:
 
   projects = "~/Projects"  # where "pick" looks for project folders
 
+  allow_dns = true         # DNS lookups without a popup (one popup less per new name; DNS can carry a little data out)
+
+  [[allow]]                # connections that need no popup: one program, to these names, on one port
+  program = "pi"           # pi (that is node), claude, codex, or the path of a program in the box
+  hosts = ["api.example.org"]
+  port = 443               # the default
+
   [[mount]]                # files of your home the box may read: they appear under /run/host/
   path = "~/.gitconfig"
   env = "GIT_CONFIG_GLOBAL"    # optional: variable that gets the path in the box
@@ -31,6 +38,7 @@ folder of yours they see. Rules for all the agents: ~/.config/aculos/AGENTS.md i
 """
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -52,6 +60,15 @@ BOX_MODEL_HOST = "169.254.1.3"                       # the host's 127.0.0.1 seen
 SYSTEM_DIRS = ("/", "/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/lib64", "/media", "/mnt", "/opt", "/proc",
                "/root", "/run", "/sbin", "/srv", "/sys", "/tmp", "/usr", "/var", "/var/home")
 SYSTEM_TREES = ("/boot/", "/dev/", "/etc/", "/proc/", "/run/", "/sys/", "/usr/")
+
+BOX_RULES = "/usr/share/agent-box/rules"            # copied by upstream's entrypoint next to the saved ones
+RULE_PREFIX = "100-aculos-"
+# program in an [[allow]] rule: regular expression for the path of its executable in the box
+PROGRAMS = {
+    "pi": r"^/usr/bin/node(-[0-9]+)?$",
+    "claude": r"^/usr/local/lib/node_modules/@anthropic-ai/claude-code/.+",
+    "codex": r"^/usr/local/lib/node_modules/@openai/codex/.+/codex$",
+}
 
 # agent: (command in the box, folder under STATE, file with the rules for every project, environment)
 AGENTS = {
@@ -210,6 +227,40 @@ def pi_local_provider(folder, port, model_id, context):
     os.replace(path + ".new", path)
 
 
+def allow_rules(conf, folder):
+    """OpenSnitch rules from the [[allow]] entries: {file name: path on the host}, written again at each start."""
+    rules_dir = os.path.join(folder, "rules")
+    shutil.rmtree(rules_dir, ignore_errors=True)
+    os.makedirs(rules_dir)
+    files = {}
+    for entry in conf.get("allow") or []:
+        program = str(entry.get("program", ""))
+        path = PROGRAMS.get(program) or (program.startswith("/") and "^" + re.escape(program) + "$")
+        hosts = entry.get("hosts") or []
+        port = int(entry.get("port", 443))
+        if not path or not hosts:
+            die(f"{CONFIG}: an [[allow]] entry needs program (pi, claude, codex or a path) and hosts")
+        for host in hosts:
+            if not re.fullmatch(r"[A-Za-z0-9.-]+", host):
+                die(f"{CONFIG}: {host!r} is not a host name")
+            name = f"{RULE_PREFIX}{re.sub(r'[^a-z0-9]+', '-', program.lower()).strip('-')}-{host}-{port}"
+            part = {"sensitive": False, "list": None}
+            rule = {
+                "created": "2026-11-25T00:00:00Z", "updated": "2026-11-25T00:00:00Z", "name": name,
+                "description": f"aculos-agent: {program} to {host}:{port} ([[allow]] in agents.toml)",
+                "action": "allow", "duration": "always", "enabled": True, "precedence": True, "nolog": False,
+                "operator": {"type": "list", "operand": "list", "data": "", "sensitive": False, "list": [
+                    dict(part, type="regexp", operand="process.path", data=path),
+                    dict(part, type="simple", operand="dest.host", data=host),
+                    dict(part, type="simple", operand="dest.port", data=str(port)),
+                ]},
+            }
+            files[name + ".json"] = os.path.join(rules_dir, name + ".json")
+            with open(files[name + ".json"], "w") as f:
+                json.dump(rule, f, indent=2)
+    return files
+
+
 def quote(text):
     return json.dumps(str(text))    # a JSON string is a YAML string
 
@@ -227,12 +278,19 @@ def override(conf, agent_env, names):
         volumes.append(f"{path}:{target}:ro,z")
         if mount.get("env"):
             env[mount["env"]] = target
-    lines = ["services:", "  ui:", f"    image: {quote(names['ui'])}", "  agent:",
-             f"    image: {quote(names['agents'])}", "    environment:"]
-    lines += [f"      {key}: {quote(value)}" for key, value in env.items()]
-    lines += ["    volumes:"] + [f"      - {quote(v)}" for v in volumes]
     folder = os.path.join(os.environ["XDG_RUNTIME_DIR"], "aculos-agent")
     os.makedirs(folder, mode=0o700, exist_ok=True)
+    for name, path in allow_rules(conf, folder).items():
+        volumes.append(f"{path}:{BOX_RULES}/{name}:ro,z")
+    if conf.get("allow_dns"):
+        env["ALLOW_DNS"] = "1"
+    # rules of ours saved by an earlier start go away first: the ones still wanted are copied again by the entrypoint
+    start = f'rm -f /etc/opensnitchd/rules/{RULE_PREFIX}*.json; exec /usr/local/bin/entrypoint.sh "$$@"'
+    lines = ["services:", "  ui:", f"    image: {quote(names['ui'])}", "  agent:",
+             f"    image: {quote(names['agents'])}",
+             f"    entrypoint: [\"/bin/sh\", \"-c\", {quote(start)}, \"entrypoint\"]", "    environment:"]
+    lines += [f"      {key}: {quote(value)}" for key, value in env.items()]
+    lines += ["    volumes:"] + [f"      - {quote(v)}" for v in volumes]
     path = os.path.join(folder, "compose.override.yaml")
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
