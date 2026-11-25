@@ -1,0 +1,33 @@
+#!/usr/bin/python3 -I
+"""Desktop notification when a new aculOs image is staged (rpm-ostreed-automatic prepares it in the background;
+it becomes the system at the next reboot). Once per image: the last one notified is in
+~/.local/state/aculos/update-notified. Started by aculos-update-notify.path when the staged image changes, and at
+login."""
+import json
+import os
+import subprocess
+
+STATE = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "aculos",
+                     "update-notified")
+
+try:
+    out = subprocess.run(["rpm-ostree", "status", "--json"], capture_output=True, text=True, timeout=60).stdout
+    staged = [d for d in json.loads(out).get("deployments", []) if d.get("staged")]
+except (OSError, subprocess.SubprocessError, ValueError):
+    raise SystemExit(0)
+if not staged:
+    raise SystemExit(0)
+image = staged[0]
+checksum = image.get("checksum", "")
+try:
+    with open(STATE) as f:
+        if f.read().strip() == checksum:
+            raise SystemExit(0)
+except FileNotFoundError:
+    pass
+version = image.get("version") or checksum[:12]   # e.g. latest.20261125-ba0ef69: build date and commit
+subprocess.run(["notify-send", "--app-name=aculOs", "--icon=system-software-update",
+                "aculOs update ready", f"The new image ({version}) starts at the next reboot."])
+os.makedirs(os.path.dirname(STATE), exist_ok=True)
+with open(STATE, "w") as f:
+    f.write(checksum + "\n")

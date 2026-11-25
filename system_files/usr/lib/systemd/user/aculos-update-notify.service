@@ -1,0 +1,10 @@
+[Unit]
+Description=Notification when a new aculOs image is ready for the next reboot
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/aculos/update-notify
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch for a new aculOs image staged for the next reboot
+
+[Path]
+# written by rpm-ostree when it stages an update (rpm-ostreed-automatic, or bootc upgrade by hand)
+PathChanged=/run/ostree/staged-deployment
+Unit=aculos-update-notify.service
+
+[Install]
+WantedBy=graphical-session.target

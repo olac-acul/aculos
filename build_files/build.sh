@@ -235,6 +235,7 @@ systemctl enable aculos-flathub.service aculos-flatpak-update.timer
 systemctl enable aculos-snapper-home.service snapper-timeline.timer snapper-cleanup.timer
 # Servizi utente: partono solo se l'utente ha la loro configurazione in ~/.config/aculos (vedi le unità)
 systemctl --global enable syncthing.service aculos-ntfy.service aculos-receive.service kanshi.service
+systemctl --global enable aculos-update-notify.service aculos-update-notify.path
 # Il timer utente di GRUB "boot riuscito" qui non serve e fallisce a ogni sessione: la configurazione statica di
 # bootupd non usa boot_success, e /boot è montato in sola lettura (visto in VM il 23/11).
 systemctl --global disable grub-boot-success.timer
