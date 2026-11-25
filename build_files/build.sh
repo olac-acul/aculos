@@ -47,7 +47,7 @@ dnf5 -y install \
 dnf5 -y install \
     zsh zsh-autosuggestions zsh-syntax-highlighting \
     eza bat ripgrep fd-find fzf jq btop duf plocate \
-    rsync pv socat wget2-wget unzip 7zip unrar snapper \
+    rsync pv socat wget2-wget unzip 7zip unrar snapper restic \
     chezmoi nodejs nodejs-npm \
     igt-gpu-tools ethtool \
     flatpak distrobox podman podman-compose \
