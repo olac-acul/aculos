@@ -47,7 +47,7 @@ dnf5 -y install \
 dnf5 -y install \
     zsh zsh-autosuggestions zsh-syntax-highlighting \
     eza bat ripgrep fd-find fzf jq btop duf plocate \
-    rsync pv socat wget2-wget unzip 7zip unrar \
+    rsync pv socat wget2-wget unzip 7zip unrar snapper \
     chezmoi nodejs nodejs-npm \
     igt-gpu-tools ethtool \
     flatpak distrobox podman podman-compose \
@@ -232,6 +232,7 @@ systemctl enable tailscaled.service
 systemctl enable tuned.service tuned-ppd.service
 systemctl enable aculos-impronta-coperchio.service
 systemctl enable aculos-flathub.service aculos-flatpak-update.timer
+systemctl enable aculos-snapper-home.service snapper-timeline.timer snapper-cleanup.timer
 # Servizi utente: partono solo se l'utente ha la loro configurazione in ~/.config/aculos (vedi le unità)
 systemctl --global enable syncthing.service aculos-ntfy.service aculos-receive.service kanshi.service
 # Il timer utente di GRUB "boot riuscito" qui non serve e fallisce a ogni sessione: la configurazione statica di

@@ -1,0 +1,14 @@
+# aculOs: hourly snapshots of /var/home. snapper's configuration lives in /etc, which belongs to the machine:
+# it is created once, at the first boot, from the template in the image.
+[Unit]
+Description=Snapshots of /var/home: create snapper's configuration
+ConditionPathExists=!/etc/snapper/configs/home
+RequiresMountsFor=/var/home
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/snapper --no-dbus -c home create-config -f btrfs -t aculos-home /var/home
+
+[Install]
+WantedBy=multi-user.target
