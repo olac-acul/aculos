@@ -261,6 +261,23 @@ def allow_rules(conf, folder):
     return files
 
 
+def daemon_config(folder):
+    """Upstream's OpenSnitch configuration plus the "Stats" section it lacks.
+
+    OpenSnitch 1.8.0 starts its statistics workers only when the configuration has "Stats". Without them every
+    connection it logs (a popup answered, a rule without nolog) waits for ever on an unbuffered channel: after a
+    few of those the daemon stops giving verdicts, and agent-box restarts it (goroutine dump seen in the box on
+    25/11/2026). Same values as OpenSnitch's own default configuration.
+    """
+    with open(os.path.join(UPSTREAM, "opensnitch", "default-config.json")) as f:
+        conf = json.load(f)
+    conf.setdefault("Stats", {"MaxEvents": 250, "MaxStats": 25, "Workers": 6})
+    path = os.path.join(folder, "opensnitchd.json")
+    with open(path, "w") as f:
+        json.dump(conf, f, indent=4)
+    return path
+
+
 def quote(text):
     return json.dumps(str(text))    # a JSON string is a YAML string
 
@@ -282,6 +299,7 @@ def override(conf, agent_env, names):
     os.makedirs(folder, mode=0o700, exist_ok=True)
     for name, path in allow_rules(conf, folder).items():
         volumes.append(f"{path}:{BOX_RULES}/{name}:ro,z")
+    volumes.append(f"{daemon_config(folder)}:/etc/opensnitchd/default-config.json:ro,z")
     if conf.get("allow_dns"):
         env["ALLOW_DNS"] = "1"
     # rules of ours saved by an earlier start go away first: the ones still wanted are copied again by the entrypoint
