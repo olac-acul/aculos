@@ -11,6 +11,7 @@ Usage:
                                              new name to create it there
   aculos-agent build [--fresh]               build the images (--fresh: from scratch, to update system and agents)
   aculos-agent stop                          close the box, if one is running, and the popup interface
+  aculos-agent stats                         open OpenSnitch's window (connections and rules) of the running box
   aculos-agent status                        images, local model server, agents' folders
 
 Settings (all optional) in ~/.config/aculos/agents.toml:
@@ -474,6 +475,19 @@ def stop():
     return subprocess.run(compose("down"), env=dict(os.environ, PWD=UPSTREAM)).returncode
 
 
+UI_NAME = "agent-box-ui"     # agent-box's container of the popup interface
+
+
+def stats():
+    """Open the statistics window of the popup interface: it starts without it (--background). A second
+    opensnitch-ui finds the first one and asks it to show its window."""
+    if not container_exists():
+        die("no box is running")
+    env = ["HOME=/tmp/home", "XDG_RUNTIME_DIR=/tmp/xdg", "QT_QPA_PLATFORM=wayland", "WAYLAND_DISPLAY=/tmp/wayland-0"]
+    return subprocess.run(["podman", "exec", UI_NAME, "env", *env, "opensnitch-ui"],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+
+
 def status():
     for what, name in images().items():
         print(f"image {what:7} {name}: {'built' if image_exists(name) else 'not built (aculos-agent build)'}")
@@ -507,6 +521,8 @@ def main():
         return stop()
     if argv and argv[0] == "status":
         return status()
+    if argv and argv[0] == "stats":
+        return stats()
     return run(argv)
 
 
