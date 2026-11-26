@@ -58,6 +58,7 @@ STATE = os.path.join(DATA_HOME, "aculos", "agents")  # mounted in the box as BOX
 BOX_HOME = "/home/agent"
 BOX_STATE = BOX_HOME + "/.aculos"
 BOX_NAME = "aculos-agent-box"                     # agent-box runs one box at a time: a fixed name
+OWNER = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "aculos-agent", "owner.pid")  # who runs the box
 BOX_FILES = "/run/host"
 BOX_MODEL_HOST = "169.254.1.3"                       # the host's 127.0.0.1 seen from the box (compose.yaml)
 SYSTEM_DIRS = ("/", "/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/lib64", "/media", "/mnt", "/opt", "/proc",
@@ -323,7 +324,11 @@ def override(conf, agent_env, names):
         env["ALLOW_DNS"] = "1"
     # rules of ours saved by an earlier start go away first: the ones still wanted are copied again by the entrypoint
     start = f'rm -f /etc/opensnitchd/rules/{RULE_PREFIX}*.json; exec /usr/local/bin/entrypoint.sh "$$@"'
-    lines = ["services:", "  ui:", f"    image: {quote(names['ui'])}", "  agent:",
+    # the popup interface without its statistics window: there is no tray to hide it in, so it would sit as a
+    # window over the agent's terminal for as long as the box runs. The approval popups still appear.
+    ui_start = "exec bash -c \"$$(sed 's/^exec opensnitch-ui .*/& --background/' /usr/local/bin/ui-entrypoint.sh)\""
+    lines = ["services:", "  ui:", f"    image: {quote(names['ui'])}",
+             f"    entrypoint: [\"/bin/bash\", \"-c\", {quote(ui_start)}]", "  agent:",
              f"    image: {quote(names['agents'])}",
              f"    entrypoint: [\"/bin/sh\", \"-c\", {quote(start)}, \"entrypoint\"]", "    environment:"]
     lines += [f"      {key}: {quote(value)}" for key, value in env.items()]
@@ -378,13 +383,23 @@ def run(argv):
     elif use_local or name == "opencode":
         die(f"no local model server answers (see [model] in {CONFIG})")
     if container_exists():
-        if forward:
-            forward.terminate()
-        die("a box is already running (one at a time). Close it, or: aculos-agent stop")
+        if owner_alive():
+            if forward:
+                forward.terminate()
+            die("a box is already running (one at a time). Close it, or: aculos-agent stop")
+        note("removing a box left running by an earlier start")
+        remove_box()
+    os.makedirs(os.path.dirname(OWNER), mode=0o700, exist_ok=True)
+    with open(OWNER, "w") as f:
+        f.write(str(os.getpid()))
 
     # Closing the terminal window sends SIGHUP: without this the box (and the agent in it) would keep running
-    # with no window, and with it the rules it holds in memory.
+    # with no window, and with it the rules it holds in memory. The removal starts first in a unit of its own,
+    # since what is left in the window's scope may be killed before the "finally" below is done (box found
+    # running with no window on 26/11/2026).
     def closed(signum, _frame):
+        subprocess.run(["systemd-run", "--user", "--quiet", "--collect", "--no-block", "podman", "rm", "--force",
+                        "--time", "3", BOX_NAME], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         raise SystemExit(128 + signum)
     for sig in (signal.SIGHUP, signal.SIGTERM):
         signal.signal(sig, closed)
@@ -404,6 +419,17 @@ def run(argv):
         remove_box()
         if forward:
             forward.terminate()
+
+
+def owner_alive():
+    """Whether the aculos-agent that started the box is still running (its pid is in OWNER)."""
+    try:
+        with open(OWNER) as f:
+            pid = int(f.read().strip())
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            return b"aculos-agent" in f.read()
+    except (OSError, ValueError):
+        return False
 
 
 def container_exists():
