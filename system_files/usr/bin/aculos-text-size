@@ -1,0 +1,55 @@
+#!/bin/bash
+# aculos-text-size: one text size for shell and apps (Noctalia, GTK, kitty).
+# The size is a percentage (100 = normal), kept in ~/.config/aculos/text-size. It sets:
+#   Noctalia   accessibility.ui_scale (the shell has no text-only scale: the whole shell grows with the text)
+#   GTK apps   text-scaling-factor (Flatpak apps too, through the settings portal)
+#   kitty      font_size = the theme's size (font_size in ~/.config/kitty/theme.conf, else 11) x the percentage,
+#              in ~/.config/kitty/text-size.conf, included last by kitty.conf
+# Apps already open pick up the new size when they restart (kitty and Noctalia at once).
+# Usage: aculos text-size              show the current size
+#        aculos text-size <percent>    set it, from 50 to 200 (for example 110)
+#        aculos text-size --apply      apply the saved size again (for example after a theme change)
+set -euo pipefail
+
+config="${XDG_CONFIG_HOME:-$HOME/.config}"
+saved="$config/aculos/text-size"
+kitty_dir="$config/kitty"
+
+current() { cat "$saved" 2>/dev/null || echo 100; }
+
+apply() {   # apply PERCENT
+    local factor base size
+    factor=$(awk -v p="$1" 'BEGIN { printf "%.2f", p / 100 }')
+
+    gsettings set org.gnome.desktop.interface text-scaling-factor "$factor"
+
+    if ! noctalia msg config-set accessibility.ui_scale "$factor" >/dev/null 2>&1; then
+        echo "Noctalia is not running: run \"aculos text-size --apply\" again in the session." >&2
+    fi
+
+    base=$(awk '$1 == "font_size" { s = $2 } END { print s ? s : 11 }' "$kitty_dir/theme.conf" 2>/dev/null || echo 11)
+    size=$(awk -v b="$base" -v f="$factor" 'BEGIN { printf "%.1f", b * f }')
+    mkdir -p "$kitty_dir"
+    printf '# Written by aculos-text-size: %s%% of the theme size (%s)\nfont_size %s\n' "$1" "$base" "$size" \
+        >"$kitty_dir/text-size.conf"
+    if ! grep -qx 'include text-size.conf' "$kitty_dir/kitty.conf" 2>/dev/null; then
+        echo 'include text-size.conf' >>"$kitty_dir/kitty.conf"
+    fi
+    pkill -USR1 -x kitty || true   # kitty reloads its configuration
+
+    echo "Text size: $1% (shell and GTK x$factor, terminal $size pt)"
+}
+
+case "${1:-}" in
+    "") echo "Text size: $(current)%" ;;
+    --apply) apply "$(current)" ;;
+    *)
+        if ! [[ $1 =~ ^[0-9]+$ ]] || [ "$1" -lt 50 ] || [ "$1" -gt 200 ]; then
+            echo "Usage: aculos text-size [<percent from 50 to 200> | --apply]" >&2
+            exit 2
+        fi
+        mkdir -p "$(dirname "$saved")"
+        echo "$1" >"$saved"
+        apply "$1"
+        ;;
+esac

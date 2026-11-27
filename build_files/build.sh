@@ -235,7 +235,7 @@ systemctl enable aculos-greeter-setup.service
 systemctl enable tailscaled.service
 systemctl enable tuned.service tuned-ppd.service
 systemctl enable aculos-fingerprint-lid.service
-systemctl enable aculos-flathub.service aculos-flatpak-update.timer
+systemctl enable aculos-flathub.service
 systemctl enable aculos-snapper-home.service snapper-timeline.timer snapper-cleanup.timer
 # User services: they start only if the user has their configuration in ~/.config/aculos (see the units)
 systemctl --global enable syncthing.service aculos-ntfy.service aculos-receive.service kanshi.service
