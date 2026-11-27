@@ -1,0 +1,63 @@
+#!/bin/bash
+# aculos-try: tries a program without changing the image, choosing the right way for it:
+#   a Flathub app ID (org.gimp.GIMP)        -> Flatpak, until "flatpak uninstall"
+#   a package in Fedora's repositories      -> "sudo dnf install --transient": gone at the next reboot
+#   a tool known to mise (CLIs, runtimes)    -> "mise use -g", until "mise unuse -g"
+#   anything else (AUR, other distributions) -> a hint for distrobox
+# If the trial goes well, the package belongs in the image.
+# Usage: aculos try <name>            show the choice and ask before installing
+#        aculos try --check <name>    only show the choice
+set -euo pipefail
+
+check=0
+[ "${1:-}" = --check ] && { check=1; shift; }
+[ $# -eq 1 ] || { echo "Usage: aculos try [--check] <name or Flathub app ID>" >&2; exit 2; }
+name=$1
+
+confirm() {   # confirm COMMAND...: show it, ask, run it
+    echo "Command: $*"
+    [ "$check" = 1 ] && exit 0
+    read -rp "Go ahead? [Y/n] " answer
+    [[ ${answer:-y} =~ ^[YySs] ]] || exit 0
+    exec "$@"
+}
+
+if [[ $name =~ ^[A-Za-z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+){2,}$ ]]; then
+    if flatpak info "$name" >/dev/null 2>&1; then
+        echo "$name is already installed (Flatpak)."
+        exit 0
+    fi
+    if flatpak remote-info flathub "$name" >/dev/null 2>&1; then
+        echo "$name: Flatpak app from Flathub. Remove it with: flatpak uninstall $name"
+        confirm flatpak install --noninteractive flathub "$name"
+    fi
+    echo "$name: not found on Flathub." >&2
+    exit 1
+fi
+
+if rpm -q "$name" >/dev/null 2>&1; then
+    echo "$name is already installed (it is in the image)."
+    exit 0
+fi
+echo "Looking for $name in Fedora's repositories..."
+if dnf list --available --quiet "$name" >/dev/null 2>&1; then
+    echo "$name: Fedora package, installed until the next reboot."
+    app=$(flatpak search --columns=application "$name" 2>/dev/null | grep -i -m 1 "\.$name$" || true)
+    [ -n "$app" ] && echo "For a graphical app Flatpak is usually better: it is on Flathub too (aculos try $app)."
+    confirm sudo dnf install --transient "$name"
+fi
+if mise registry "$name" >/dev/null 2>&1; then
+    echo "$name: tool known to mise ($(mise registry "$name" | awk '{print $1}')). Remove it with: mise unuse -g $name"
+    confirm mise use -g "$name@latest"
+fi
+
+echo "$name: not in Fedora's repositories or in mise's registry."
+apps=$(flatpak search --columns=application,name "$name" 2>/dev/null | grep -v '^No matches' | head -n 5 || true)
+if [ -n "$apps" ]; then
+    echo "Flathub has these apps: try one with \"aculos try <app ID>\"."
+    echo "$apps" | sed 's/^/  /'
+fi
+echo "From another distribution (Arch with the AUR, Ubuntu...) use distrobox, for example:"
+echo "  distrobox create --name arch --image docker.io/library/archlinux:latest"
+echo "  distrobox enter arch    # install it there, then: distrobox-export --app <name> (or --bin <path>)"
+exit 1

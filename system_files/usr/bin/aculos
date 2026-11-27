@@ -1,0 +1,50 @@
+#!/bin/bash
+# aculos: one entry point for the aculOs commands. "aculos NAME ARGS..." runs "aculos-NAME ARGS...", so both
+# spellings work. "aculos" alone (or "aculos help") lists the commands with a one-line description, taken from the
+# first line of each command that reads "aculos-NAME...: description".
+set -euo pipefail
+
+describe() {   # describe FILE NAME: the description in the command's header, up to the first stop or comma
+    local d
+    d=$(grep -m 1 -oP "aculos-$2\b[^:]*:\s*\K.*" "$1" 2>/dev/null | sed -E 's/[.,;] .*//; s/ \(.*//; s/[.,;:]*$//')
+    if [ ${#d} -gt 64 ]; then d="$(cut -c 1-64 <<<"$d" | sed -E 's/ [^ ]*$//')..."; fi
+    echo "$d"
+}
+
+commands() {   # "name:description" for every aculos-* command on PATH (first one wins, like the shell)
+    local dir f name
+    declare -A seen=()
+    IFS=: read -ra dirs <<<"$PATH"
+    for dir in "${dirs[@]}"; do
+        for f in "$dir"/aculos-*; do
+            [ -x "$f" ] && [ -f "$f" ] || continue
+            name=${f##*/aculos-}
+            [ -n "${seen[$name]:-}" ] && continue
+            seen[$name]=1
+            printf '%s:%s\n' "$name" "$(describe "$f" "$name")"
+        done
+    done | sort
+}
+
+usage() {
+    echo "Usage: aculos <command> [arguments]"
+    echo
+    echo "Commands:"
+    commands | while IFS=: read -r name desc; do printf '  %-10s %s\n' "$name" "$desc"; done
+}
+
+case "${1:-help}" in
+    help | -h | --help) usage ;;
+    --complete) commands ;;   # used by the zsh completion
+    *)
+        name=$1
+        shift
+        if [[ $name =~ ^[a-z0-9][a-z0-9-]*$ ]] && command -v "aculos-$name" >/dev/null; then
+            exec "aculos-$name" "$@"
+        fi
+        echo "aculos: unknown command \"$name\"" >&2
+        echo >&2
+        usage >&2
+        exit 2
+        ;;
+esac

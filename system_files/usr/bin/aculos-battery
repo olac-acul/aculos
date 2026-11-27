@@ -1,0 +1,44 @@
+#!/bin/bash
+# aculos-battery: battery charge thresholds. By default charging starts below 80% and stops at 85%
+# (tmpfiles.d/aculos-battery.conf), which makes the battery last longer.
+# Usage: aculos battery            show the charge and the thresholds
+#        aculos battery full       charge to 100% once: until "aculos battery normal" or the next reboot
+#        aculos battery normal     back to 80-85%
+# Administrators (group wheel) can change the thresholds without sudo (udev rule 70-aculos-battery.rules).
+set -euo pipefail
+START=80 END=85
+
+bat=""
+for b in /sys/class/power_supply/BAT*; do
+    [ -e "$b/charge_control_end_threshold" ] && { bat=$b; break; }
+done
+[ -n "$bat" ] || { echo "No battery with charge thresholds on this machine." >&2; exit 1; }
+
+set_thresholds() {   # set_thresholds START END; the order keeps start below end at every step
+    if [ "$2" -ge "$(cat "$bat/charge_control_end_threshold")" ]; then
+        echo "$2" >"$bat/charge_control_end_threshold"
+        echo "$1" >"$bat/charge_control_start_threshold"
+    else
+        echo "$1" >"$bat/charge_control_start_threshold"
+        echo "$2" >"$bat/charge_control_end_threshold"
+    fi
+}
+
+show() {
+    echo "Charge:    $(cat "$bat/capacity")% ($(cat "$bat/status"))"
+    echo "Charging:  starts below $(cat "$bat/charge_control_start_threshold")%, stops at $(cat "$bat/charge_control_end_threshold")%"
+}
+
+if [ $# -gt 0 ] && [ ! -w "$bat/charge_control_end_threshold" ]; then
+    echo "Cannot change the thresholds: only administrators (group wheel) can." >&2
+    exit 1
+fi
+case "${1:-}" in
+    "") show ;;
+    full) set_thresholds 0 100 && show && echo "Back to $START-$END% with \"aculos battery normal\" or at the next reboot." ;;
+    normal) set_thresholds "$START" "$END" && show ;;
+    *)
+        echo "Usage: aculos battery [full|normal]" >&2
+        exit 2
+        ;;
+esac

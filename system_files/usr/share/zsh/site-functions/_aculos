@@ -1,0 +1,9 @@
+#compdef aculos
+# Completion for "aculos": the command names with their description, then files for the arguments.
+if (( CURRENT == 2 )); then
+    local -a cmds
+    cmds=(${(f)"$(aculos --complete 2>/dev/null)"})
+    _describe 'aculos command' cmds
+else
+    _files
+fi

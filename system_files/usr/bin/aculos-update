@@ -1,0 +1,41 @@
+#!/bin/bash
+# aculos-update: updates the system image and the Flatpak apps now, instead of waiting for the daily timers.
+# The new image is staged and becomes active at the next reboot: nothing running is restarted.
+# Usage: aculos update            stage the latest image and update the Flatpak apps (asks for the password)
+#        aculos update status     show the running image and whether an update is waiting for a reboot
+set -euo pipefail
+
+status() {
+    rpm-ostree status --json | python3 -I -c '
+import json, sys, datetime
+d = json.load(sys.stdin)["deployments"]
+def line(x):
+    when = datetime.datetime.fromtimestamp(x["timestamp"]).strftime("%Y-%m-%d %H:%M")
+    version = x.get("version", "?")
+    return f"{version} (built {when})"
+booted = next(x for x in d if x["booted"])
+staged = next((x for x in d if x.get("staged")), None)
+print("Running:   ", line(booted))
+print("Next boot: ", line(staged) + "  <- reboot to use it" if staged else "same image (no update waiting)")
+'
+}
+
+case "${1:-}" in
+    status) status ;;
+    "")
+        echo "== System image"
+        sudo bootc upgrade
+        echo
+        echo "== Flatpak apps"
+        sudo flatpak update --system --noninteractive
+        if flatpak remotes --user --columns=name | grep -q .; then
+            flatpak update --user --noninteractive
+        fi
+        echo
+        status
+        ;;
+    *)
+        echo "Usage: aculos update [status]" >&2
+        exit 2
+        ;;
+esac
