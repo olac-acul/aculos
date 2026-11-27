@@ -9,7 +9,7 @@
 #   6. what is left to do by hand.
 # Nothing personal is built in: addresses are asked once and kept in ~/.local/state/aculos/setup.env.
 #
-# At login it also sets a stock wallpaper on an account that has none.
+# At login it also gives a new account the default theme (squared, see aculos theme), or at least a stock wallpaper.
 #
 # Usage: aculos-setup             run the setup
 #        aculos-setup --welcome   at login: open it in a terminal, unless already done or declined
@@ -20,13 +20,16 @@ answers="$state/setup.env"
 done_stamp="$state/setup-done"
 agent="$HOME/.bitwarden-ssh-agent.sock"   # Bitwarden desktop's SSH agent
 
-default_wallpaper() {   # a fresh account has none: set a stock one, until a theme or the user picks another
+default_look() {   # a fresh account has no theme: apply the default one; if that fails, at least a stock wallpaper
     local current="" file
     command -v noctalia >/dev/null || return 0
     for _ in $(seq 20); do   # at login Noctalia may still be starting
         current=$(noctalia msg wallpaper-get 2>/dev/null) && break
         sleep 0.5
     done
+    if [ ! -e "$state/theme" ] && command -v aculos-theme >/dev/null; then
+        aculos-theme --default squared >/dev/null 2>&1 && return 0
+    fi
     current=$(tail -n 1 <<<"$current")
     [ -n "$current" ] && [ -f "$current" ] && return 0
     for file in /usr/share/backgrounds/aculos/* /usr/share/backgrounds/fedora-workstation/*_dark.*; do
@@ -35,7 +38,7 @@ default_wallpaper() {   # a fresh account has none: set a stock one, until a the
 }
 
 if [ "${1:-}" = "--welcome" ]; then
-    default_wallpaper
+    default_look
     [ -e "$done_stamp" ] || [ -d "${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi" ] && exit 0
     exec kitty --title "aculOs setup" aculos-setup
 fi

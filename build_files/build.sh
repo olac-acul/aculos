@@ -251,7 +251,7 @@ systemctl disable getty@tty1.service || true
 ### Versions of the main components, to know which build is in use
 mkdir -p /usr/share/aculos
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
-    noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd syncthing \
+    kernel noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd syncthing \
     firefox chromium librewolf codium mark-flowy starship kanshi wl-mirror ax86-terminus-ttf-fonts papirus-icon-theme > /usr/share/aculos/versions.txt
 cat /usr/share/aculos/versions.txt
 

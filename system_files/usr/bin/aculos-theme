@@ -9,6 +9,8 @@ Usage:
   aculos theme --icons       choose the icons again from the current wallpaper (run by Noctalia when it changes)
   aculos theme --after-apply <name>   apply <name> again without the login screen, unless the theme changed
                                       (for scripts that rewrite the dotfiles, like a chezmoi hook)
+  aculos theme --default <name>       apply <name> only if no theme was chosen yet, without the login screen
+                                      (run by aculos-setup at login, so a new account starts themed)
 
 The wallpaper: switching theme sets the theme's own; a wallpaper you pick afterwards (in Noctalia) stays until you
 switch theme or run "aculos theme --wallpaper".
@@ -501,7 +503,7 @@ def session_environment():
 def main():
     args = sys.argv[1:]
     if args and args[0] not in ("-h", "--help") and not session_environment():
-        if args[0] == "--after-apply":   # a hook outside a desktop session: nothing to restart
+        if args[0] in ("--after-apply", "--default"):   # outside a desktop session: nothing to restart
             warn("no desktop session, theme not applied again (run: aculos theme --greeter)")
             return
         fail("no desktop session: run aculos theme from the desktop")
@@ -523,6 +525,10 @@ def main():
             except OSError:
                 wallpaper = current_wallpaper()
             apply_icons(load(name).get("icons"), wallpaper)
+        return
+    if len(args) == 2 and args[0] == "--default":
+        if active() is None:
+            apply(args[1], greeter=False)
         return
     if len(args) == 2 and args[0] == "--after-apply":
         return apply(args[1], greeter=args[1] != active())
