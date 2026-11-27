@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="system_files/usr/share/aculos/logo/aculos-logo.svg">
+    <img src="system_files/usr/share/aculos/logo/aculos-logo-light.svg" alt="aculOs" width="360">
+  </picture>
+</p>
+
 # aculOs
 
 A personal, immutable Linux desktop built as a [bootc](https://bootc-dev.github.io/bootc/) image on top of

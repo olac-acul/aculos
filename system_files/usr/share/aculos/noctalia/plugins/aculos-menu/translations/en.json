@@ -12,6 +12,8 @@
     "agents-hint": "Coding agents in a box",
     "remote": "Remote",
     "remote-hint": "Session on your server",
+    "tools": "Tools",
+    "tools-hint": "System monitor, shortcuts, panels of the plugins",
     "apps": "Apps",
     "apps-hint": "Flatpak apps, try a program"
   },
@@ -38,7 +40,13 @@
     "agent-codex": "Codex",
     "remote": "Open the remote session",
     "flatpak": "Install the apps in the list",
-    "try": "Try \"{name}\""
+    "try": "Try \"{name}\"",
+    "system-monitor": "System monitor",
+    "shortcuts": "Keyboard shortcuts",
+    "taildrop-send": "Send files with Taildrop",
+    "vpn": "VPN connections",
+    "notes": "Notes",
+    "file-search": "Find files"
   },
   "hint": {
     "title": "Type to search, or \"try <name>\"",

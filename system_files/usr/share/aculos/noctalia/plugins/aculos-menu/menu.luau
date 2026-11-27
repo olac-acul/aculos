@@ -5,7 +5,8 @@
 -- other text searches all items. "try <name>" offers to try a program (aculos try), "save <name>" to save the
 -- current screen layout (aculos display save). Items also show up in the launcher's global search.
 -- Commands that ask for a password or print something worth reading run in kitty, kept open at the end; the others
--- run quietly and answer with a notification. Themes come from "aculos theme".
+-- run quietly and answer with a notification. Themes come from "aculos theme". Tools that open the panel of a
+-- community plugin are listed only when that plugin is enabled in Noctalia.
 
 local function tr(key, vars)
     return noctalia.tr(key, vars)
@@ -42,6 +43,7 @@ local CATEGORIES = {
     { key = "battery", glyph = "battery-2" },
     { key = "agents", glyph = "robot" },
     { key = "remote", glyph = "server" },
+    { key = "tools", glyph = "tools" },
     { key = "apps", glyph = "apps" },
 }
 
@@ -74,8 +76,27 @@ local ITEMS = {
         function() spawn({ "kitty", "--title", "Codex", "aculos-agent", "pick", "codex" }) end },
     { "remote", "remote", "terminal-2", "aculos remote",
         function() spawn({ "kitty", "--title", "Remote", "aculos-remote" }) end },
+    { "tools", "system-monitor", "cpu", "noctalia: control-center system",
+        function() spawn({ "noctalia", "msg", "panel-open", "control-center", "system" }) end },
+    { "tools", "shortcuts", "keyboard", "niri: show-hotkey-overlay",
+        function() spawn({ "niri", "msg", "action", "show-hotkey-overlay" }) end },
     { "apps", "flatpak", "package", "aculos flatpak", function() terminal({ "aculos", "flatpak" }) end },
 }
+
+-- Tools from community plugins: { id, glyph, plugin id, panel }, shown only when the plugin is enabled
+local PLUGIN_TOOLS = {
+    { "taildrop-send", "upload", "carlocamacho/taildrop", "send" },
+    { "vpn", "shield-lock", "andrewdems/vpn-manager", "panel" },
+    { "notes", "notes", "noctalia/notes", "panel" },
+    { "file-search", "search", "nightwatch75/file-search", "panel" },
+}
+local enabledPlugins = ""   -- output of "noctalia msg config-get plugins.enabled", refreshed when the menu opens
+local function loadPlugins()
+    noctalia.runAsync({ "noctalia", "msg", "config-get", "plugins.enabled" }, function(r)
+        enabledPlugins = (r and r.exitCode == 0) and (r.stdout or "") or ""
+    end, 10000)
+end
+loadPlugins()
 for _, size in ipairs({ 90, 100, 110, 125 }) do
     table.insert(ITEMS, { "appearance", "text-" .. size, "text-size", "aculos text-size " .. size,
         function() quiet({ "aculos", "text-size", tostring(size) }, tr("item.text-size")) end, size })
@@ -129,10 +150,26 @@ local function themeRows()
     return rows
 end
 
+local function pluginRows()
+    local rows = {}
+    for _, t in ipairs(PLUGIN_TOOLS) do
+        local id, glyph, plugin, panel = t[1], t[2], t[3], t[4]
+        if string.find(enabledPlugins, plugin, 1, true) then
+            actions[id] = function() noctalia.togglePanel(plugin .. ":" .. panel) end
+            table.insert(rows, { id = id, title = tr("item." .. id), subtitle = "plugin: " .. plugin,
+                glyph = glyph, category = "tools" })
+        end
+    end
+    return rows
+end
+
 local function allRows()
     local rows = {}
     for _, item in ipairs(ITEMS) do
         table.insert(rows, itemRow(item))
+    end
+    for _, row in ipairs(pluginRows()) do
+        table.insert(rows, row)
     end
     for _, row in ipairs(themeRows()) do
         table.insert(rows, row)
@@ -174,6 +211,7 @@ function onQuery(query)
     local category = categoryFor(text)
     if text == "" then
         loadThemes()
+        loadPlugins()
         for _, c in ipairs(CATEGORIES) do
             table.insert(rows, { id = "category:" .. c.key, title = tr("category." .. c.key), subtitle = tr("category." .. c.key .. "-hint"), glyph = c.glyph })
         end

@@ -248,6 +248,15 @@ systemctl set-default graphical.target
 # The graphical login is greetd on tty1: no getty on the same terminal
 systemctl disable getty@tty1.service || true
 
+### Name and logo of the system (os-release): shown by the boot menu, the settings and system tools. ID stays
+### "fedora", so tools that check the distribution keep working.
+sed -i -e 's/^NAME=.*/NAME="aculOs"/' \
+    -e "s/^PRETTY_NAME=.*/PRETTY_NAME=\"aculOs (Fedora Linux $(rpm -E %fedora))\"/" \
+    -e 's/^LOGO=.*/LOGO=aculos-logo/' \
+    -e 's|^HOME_URL=.*|HOME_URL="https://github.com/olac-acul/aculos"|' /usr/lib/os-release
+grep -q '^VARIANT_ID=' /usr/lib/os-release || printf 'VARIANT="aculOs"\nVARIANT_ID=aculos\n' >> /usr/lib/os-release
+cat /usr/lib/os-release
+
 ### Versions of the main components, to know which build is in use
 mkdir -p /usr/share/aculos
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \

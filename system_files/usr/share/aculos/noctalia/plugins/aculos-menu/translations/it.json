@@ -12,6 +12,8 @@
     "agents-hint": "Agenti di programmazione nella scatola",
     "remote": "Remoto",
     "remote-hint": "Sessione sul tuo server",
+    "tools": "Strumenti",
+    "tools-hint": "Monitor di sistema, scorciatoie, pannelli dei plugin",
     "apps": "App",
     "apps-hint": "App Flatpak, prova un programma"
   },
@@ -38,7 +40,13 @@
     "agent-codex": "Codex",
     "remote": "Apri la sessione remota",
     "flatpak": "Installa le app della lista",
-    "try": "Prova «{name}»"
+    "try": "Prova «{name}»",
+    "system-monitor": "Monitor di sistema",
+    "shortcuts": "Scorciatoie da tastiera",
+    "taildrop-send": "Invia file con Taildrop",
+    "vpn": "Connessioni VPN",
+    "notes": "Note",
+    "file-search": "Cerca file"
   },
   "hint": {
     "title": "Scrivi per cercare, oppure «prova <nome>»",
