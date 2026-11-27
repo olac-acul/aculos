@@ -3,8 +3,8 @@
 // blinks until the end. The password box (disk encryption) and messages appear below the logo.
 // refresh() runs 50 times a second: times below are in refresh ticks.
 
-START = 15;    // ticks before the first letter
-STEP = 7;      // ticks per letter
+START = 25;    // ticks before the first letter (half a second)
+STEP = 15;     // ticks per letter (0.3 s: the whole name in about 2 s)
 BLINK = 25;    // ticks the cursor stays on, then off
 
 Window.SetBackgroundTopColor(0, 0, 0);
