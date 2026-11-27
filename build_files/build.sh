@@ -131,6 +131,10 @@ test -f /usr/lib/agent-box/compose.yaml -a -f /usr/lib/agent-box/Containerfile
 ### The repo's system files (system_files/) copied to /, after the packages so they override their defaults
 cp -avf "/ctx/system_files"/. /
 
+### Login screen: the aculOs logo in place of the Noctalia logo (bottom centre of noctalia-greeter). The greeter has
+### no setting for a custom logo, only [appearance].hide_logo: replace the package's file (square slot).
+cp /usr/share/aculos/logo/aculos-logo-square-transparent.svg /usr/share/noctalia-greeter/assets/noctalia.svg
+
 ### SELinux: the noctalia-greeter state folder with the display manager label
 # The package ships no SELinux rules: the folder would get var_lib_t and the greeter (domain xdm_t) could not
 # replace its own files (AVC "unlink" on sync.toml, seen in the VM on Nov 23). Same label as /var/lib/greetd.
