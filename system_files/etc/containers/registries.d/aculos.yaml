@@ -1,3 +1,5 @@
 docker:
   ghcr.io/olac-acul/aculos:
     use-sigstore-attachments: true
+  quay.io/olac-acul/aculos:
+    use-sigstore-attachments: true

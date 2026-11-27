@@ -15,6 +15,10 @@ on:
 
 env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
+  # Second registry, in case GHCR or the GitHub account goes away: the same image (same digest) and a copy of the
+  # base. Skipped until the QUAY_USERNAME secret (a Quay robot account) is set.
+  QUAY_REGISTRY: "quay.io/olac-acul"
+  QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ inputs.brand_name}}-${{ inputs.stream_name }}
@@ -166,4 +170,32 @@ jobs:
           # https://github.com/coreos/rpm-ostree/issues/5509
           # use old bundle format, so we can use newer cosign 3.X.X instead of 2.X.X
           cosign sign -y --new-bundle-format=false --use-signing-config=false --key env://COSIGN_PRIVATE_KEY ${IMAGE_REGISTRY}/${IMAGE_NAME}@${DIGEST}
+
+      - name: Login to Quay
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.QUAY_USERNAME != ''
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Copy to Quay and sign there
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.QUAY_USERNAME != ''
+        env:
+          ALIAS_TAGS: ${{ steps.gen-build-tags.outputs.alias_tags }}
+          COSIGN_EXPERIMENTAL: false
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+          DIGEST: ${{ steps.push-image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          # Same digest on both registries, so "bootc switch" to Quay finds the very same image. The signature
+          # is made again: it names the repository (ghcr.io/...), and the policy in the image checks that name.
+          for tag in ${ALIAS_TAGS}; do
+            skopeo copy --preserve-digests --all --retry-times 3 \
+              docker://${IMAGE_REGISTRY}/${IMAGE_NAME}@${DIGEST} docker://${QUAY_REGISTRY}/${IMAGE_NAME}:${tag}
+          done
+          cosign sign -y --new-bundle-format=false --use-signing-config=false --key env://COSIGN_PRIVATE_KEY ${QUAY_REGISTRY}/${IMAGE_NAME}@${DIGEST}
+          # The base too, for a build outside GitHub (it only copies the layers Quay does not have yet)
+          base=$(sed -n 's/^FROM \(ghcr.io\/ublue-os\/[^ ]*\).*/\1/p' Containerfile | tail -n 1)
+          skopeo copy --preserve-digests --all --retry-times 3 docker://${base} docker://${QUAY_REGISTRY}/${base##*/}
 

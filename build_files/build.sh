@@ -162,16 +162,19 @@ import json
 p = "/etc/containers/policy.json"
 with open(p) as f:
     politica = json.load(f)
-politica["transports"]["docker"]["ghcr.io/olac-acul/aculos"] = [{
-    "type": "sigstoreSigned",
-    "keyPath": "/etc/pki/containers/aculos.pub",
-    "signedIdentity": {"type": "matchRepository"},
-}]
+# GHCR, and Quay as the second registry (same image, signed there with the same key)
+for repo in ("ghcr.io/olac-acul/aculos", "quay.io/olac-acul/aculos"):
+    politica["transports"]["docker"][repo] = [{
+        "type": "sigstoreSigned",
+        "keyPath": "/etc/pki/containers/aculos.pub",
+        "signedIdentity": {"type": "matchRepository"},
+    }]
 with open(p, "w") as f:
     json.dump(politica, f, indent=4)
     f.write("\n")
 FINE
 grep -q '"ghcr.io/olac-acul/aculos"' /etc/containers/policy.json
+grep -q '"quay.io/olac-acul/aculos"' /etc/containers/policy.json
 
 ### Noctalia come servizio utente legato alla sessione di niri
 # Il servizio è quello fornito da Noctalia, con il WantedBy per niri attivato.
