@@ -1,13 +1,14 @@
 # aculos
 
-Immagine bootc di aculOs. Repository **pubblico**.
+The aculOs bootc image. This repository is **public**.
 
-## Regole
-- Rispondi in italiano.
-- **Niente dati personali o della rete di casa** in questo repo: niente segreti, domini, indirizzi IP, nomi delle
-  macchine, email. La parte personale sta nei dotfiles privati. Un controllo prima del commit e uno in CI lo
-  verificano: se scatta, togli il dato invece di aggirare il controllo.
-- Il sistema si cambia solo da qui: `Containerfile`, `build_files/`, `system_files/`.
-- Contenuto di sistema in `/usr` (`/usr/lib/…`, `/usr/share/aculos/`); `/etc` il meno possibile.
-- Repo esterni (Terra, LibreWolf…) abilitati solo per i pacchetti che servono, poi disattivati.
-- Mai `cosign.key` nel repo (è nel `.gitignore`); `cosign.pub` sì.
+## Rules
+- **No personal or home-network data** in this repo: no secrets, domains, IP addresses, machine names or emails.
+  Personal settings live in private dotfiles. A pre-commit check and a CI check look for them: if one fires, remove
+  the data instead of working around the check.
+- Everything in this repo is in English: code, comments, file names and documentation.
+- The system changes only from here: `Containerfile`, `build_files/`, `system_files/`.
+- System content goes in `/usr` (`/usr/lib/…`, `/usr/share/aculos/`); keep `/etc` to a minimum.
+- External repositories (Terra, LibreWolf…) are enabled only for the packages needed, then disabled.
+- Open source software only (OSI license, checked on the build actually installed).
+- Never commit `cosign.key` (it is in `.gitignore`); `cosign.pub` is fine.

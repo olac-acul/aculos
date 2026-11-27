@@ -1,39 +1,40 @@
 # aculOs
 
-Distribuzione Linux immutabile personale, costruita come immagine [bootc](https://bootc-dev.github.io/bootc/)
-sopra [Universal Blue](https://universal-blue.org/) `base-main` (Fedora). Pensata per un ThinkPad X1 Carbon Gen 11,
-con [niri](https://github.com/YaLTeR/niri) e [Noctalia](https://github.com/noctalia-dev/noctalia-shell).
+A personal, immutable Linux desktop built as a [bootc](https://bootc-dev.github.io/bootc/) image on top of
+[Universal Blue](https://universal-blue.org/) `base-main` (Fedora). Made for a ThinkPad X1 Carbon Gen 11, with the
+[niri](https://github.com/YaLTeR/niri) scrolling compositor and the [Noctalia](https://github.com/noctalia-dev/noctalia-shell) shell.
 
-È un progetto personale: le scelte seguono un uso preciso e possono cambiare senza preavviso.
+It is a personal project: choices follow one person's use and may change at any time.
 
-> **Stato:** fase 3, preparazione dell'hardware: impronta digitale (anche nel blocco schermo, staccata a coperchio chiuso), profili energetici con tuned-ppd, soglie di carica. Sopra la base della fase 2: niri, Noctalia, noctalia-greeter su greetd, portali, gnome-keyring, Tailscale.
+## What's inside
 
-## Struttura
+- niri + Noctalia, with noctalia-greeter on greetd
+- Laptop tuning: fingerprint login, battery charge thresholds, tuned power profiles, zram
+- Tailscale, Syncthing, rootless Podman, snapshots of `/var/home` with snapper
+- `aculos-agent`: coding agents (pi, Claude Code, Codex) in a sandboxed container, with OpenSnitch asking before
+  every outbound connection
+- Open source apps only (Claude Code, if used, runs only inside the agent box)
 
-| Percorso | Cosa contiene |
-| --- | --- |
-| `Containerfile` | immagine di base e passi della build |
-| `build_files/build.sh` | pacchetti e configurazione del sistema |
-| `system_files/` | file copiati così come sono nell'immagine (`/usr`, `/etc`) |
-| `disk_config/` | configurazione per le immagini disco e le ISO |
-| `Justfile` | comandi per costruire e provare l'immagine in locale |
+## Install
 
-GitHub Actions costruisce l'immagine a ogni modifica e ogni giorno, la pubblica su GHCR e la firma con cosign.
-
-## Uso
-
-Da un sistema bootc o Fedora Atomic già installato:
+From any bootc or Fedora Atomic system:
 
 ```bash
 sudo bootc switch ghcr.io/olac-acul/aculos:latest
 ```
 
-Verifica della firma:
+Images are built daily by GitHub Actions and signed with cosign:
 
 ```bash
 cosign verify --key cosign.pub ghcr.io/olac-acul/aculos:latest
 ```
 
-## Licenza
+## Credits
 
-Apache-2.0, come il [template di Universal Blue](https://github.com/ublue-os/image-template) da cui parte.
+- [Universal Blue image template](https://github.com/ublue-os/image-template), which this repository starts from
+- [niri](https://github.com/YaLTeR/niri), [Noctalia](https://github.com/noctalia-dev/noctalia-shell) and
+  [Terra](https://terra.fyralabs.com/) for packages not in Fedora
+
+## License
+
+Apache-2.0, like the Universal Blue template.

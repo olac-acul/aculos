@@ -1,11 +1,11 @@
 #!/bin/bash
-# Build di aculOs: gira dentro il Containerfile, sopra base-main.
-# Regola per i repo esterni (Terra, LibreWolf...): abilitarli solo per i pacchetti che servono, poi disattivarli.
+# aculOs build: runs inside the Containerfile, on top of base-main.
+# Rule for external repos (Terra, LibreWolf...): enable them only for the packages needed, then disable them.
 
 set -ouex pipefail
 
-### Pacchetti di Fedora
-# Fase 2: base del desktop (niri, greeter, portali, portachiavi, terminale, Tailscale)
+### Fedora packages
+# Phase 2: desktop base (niri, greeter, portals, keyring, terminal, Tailscale)
 dnf5 -y install \
     niri \
     xwayland-satellite \
@@ -19,21 +19,21 @@ dnf5 -y install \
     polkit \
     kitty \
     tailscale
-# niri porta con sé, come dipendenze consigliate, i programmi della sua configurazione di esempio. In aculOs li
-# sostituiscono kitty (terminale) e Noctalia (barra, launcher, blocco schermo): via, così non compaiono nel menu.
+# niri brings along, as recommended dependencies, the programs of its example configuration. In aculOs they are
+# replaced by kitty (terminal) and Noctalia (bar, launcher, lock screen): remove them, so they don't show in the menu.
 dnf5 -y remove alacritty fuzzel swaylock waybar
 
-# Fase 3: portatile. tuned-ppd al posto di power-profiles-daemon (stessa interfaccia D-Bus, che Noctalia usa);
-# intel-lpmd e thermald sono già nella base.
+# Phase 3: laptop. tuned-ppd instead of power-profiles-daemon (same D-Bus interface, which Noctalia uses);
+# intel-lpmd and thermald are already in the base.
 dnf5 -y swap power-profiles-daemon tuned-ppd
 dnf5 -y install \
     fprintd \
     fprintd-pam
 
-# Fase 5: comandi usati dai plugin di Noctalia (udiskie per le chiavette USB)
+# Phase 5: commands used by the Noctalia plugins (udiskie for USB sticks)
 dnf5 -y install udiskie
 
-# Fase 4: Syncthing e le app di sistema (file manager con anteprime, editor da terminale, appunti, tema GTK3)
+# Phase 4: Syncthing and the system apps (file manager with thumbnails, terminal editor, clipboard, GTK3 theme)
 dnf5 -y install \
     syncthing \
     nautilus \
@@ -43,7 +43,7 @@ dnf5 -y install \
     wl-clipboard \
     adw-gtk3-theme
 
-# Fase 5: shell, strumenti da terminale, browser
+# Phase 5: shell, terminal tools, browsers
 dnf5 -y install \
     zsh zsh-autosuggestions zsh-syntax-highlighting \
     eza bat ripgrep fd-find fzf jq btop duf plocate \
@@ -53,37 +53,37 @@ dnf5 -y install \
     flatpak distrobox podman podman-compose \
     firefox chromium
 
-# Fase 5: schermi esterni. kanshi riapplica la disposizione salvata per ogni combinazione di schermi (i profili
-# li scrive aculos-display), wl-mirror duplica uno schermo su un altro, wlr-randr serve per le diagnosi.
+# Phase 5: external displays. kanshi reapplies the layout saved for each combination of displays (the profiles are
+# written by aculos-display), wl-mirror mirrors one display onto another, wlr-randr is for diagnostics.
 dnf5 -y install kanshi wl-mirror wlr-randr
 
-# Fase 5: per i temi alternativi del desktop: font a celle Terminus in TrueType (famiglia "Terminus (TTF)")
-# e le icone Papirus (le cartelle colorate le ricava il comando dei temi, per l'utente)
+# Phase 5: for the alternative desktop themes: the Terminus bitmap-style font in TrueType (family "Terminus (TTF)")
+# and the Papirus icons (the colored folders are derived by the themes command, for the user)
 dnf5 -y install ax86-terminus-ttf-fonts papirus-icon-theme papirus-icon-theme-dark
 
-### Pacchetti di Terra (Noctalia)
-# terra-release porta il file del repo e la chiave GPG; il repo resta installato ma spento,
-# e si accende solo per i pacchetti che servono.
+### Terra packages (Noctalia)
+# terra-release brings the repo file and the GPG key; the repo stays installed but disabled,
+# and is enabled only for the packages needed.
 dnf5 -y install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
 dnf5 config-manager setopt terra.enabled=0
 dnf5 -y install --enablerepo=terra \
     noctalia-nightly \
     noctalia-greeter
 
-# Fase 5, sempre da Terra: prompt, bw per chezmoi, mise per provare strumenti in user space, VSCodium
+# Phase 5, also from Terra: prompt, bw for chezmoi, mise to try out tools in user space, VSCodium
 dnf5 -y install --enablerepo=terra \
     starship \
     bitwarden-cli \
     mise \
     codium
 
-### LibreWolf dal suo repo ufficiale (installato ma spento, come Terra)
+### LibreWolf from its official repo (installed but disabled, like Terra)
 curl -fsSL https://repo.librewolf.net/librewolf.repo -o /etc/yum.repos.d/librewolf.repo
 dnf5 config-manager setopt librewolf.enabled=0
 dnf5 -y install --enablerepo=librewolf librewolf
 
-### MarkFlowy: RPM delle release di GitHub, con versione e sha256 fissati (non c'è un repo).
-# Per aggiornare: cambiare le due righe con i valori della release nuova (lo sha256 è nel campo "digest" dell'asset).
+### MarkFlowy: RPM from the GitHub releases, version and sha256 pinned (there is no repo).
+# To update: change the two lines to the values of the new release (the sha256 is the "digest" field of the asset).
 MARKFLOWY_VERSION=1.4.0
 MARKFLOWY_SHA256=0f00d5cee1603a3da4372d777b66447f500abb20ab37c70875f1dfbaf8b1f50c
 curl -fsSL -o /tmp/markflowy.rpm \
@@ -128,22 +128,22 @@ rm -rf /usr/lib/agent-box/.github
 echo "${AGENT_BOX_COMMIT}" > /usr/lib/agent-box/COMMIT
 test -f /usr/lib/agent-box/compose.yaml -a -f /usr/lib/agent-box/Containerfile
 
-### File di sistema del repo (system_files/) copiati in /, dopo i pacchetti così prevalgono sui loro default
+### The repo's system files (system_files/) copied to /, after the packages so they override their defaults
 cp -avf "/ctx/system_files"/. /
 
-### SELinux: la cartella di stato di noctalia-greeter con l'etichetta dei display manager
-# Il pacchetto non porta regole SELinux: la cartella prenderebbe var_lib_t e il greeter (dominio xdm_t) non
-# potrebbe sostituire i propri file (AVC "unlink" su sync.toml, visto in VM il 23/11). Stessa etichetta di
-# /var/lib/greetd. Sul sistema la applica tmpfiles (riga "Z" in noctalia-greeter.conf).
+### SELinux: the noctalia-greeter state folder with the display manager label
+# The package ships no SELinux rules: the folder would get var_lib_t and the greeter (domain xdm_t) could not
+# replace its own files (AVC "unlink" on sync.toml, seen in the VM on Nov 23). Same label as /var/lib/greetd.
+# On the installed system tmpfiles applies it ("Z" line in noctalia-greeter.conf).
 semanage fcontext -a -N -t xdm_var_lib_t '/var/lib/noctalia-greeter(/.*)?'
 grep -q 'noctalia-greeter.*xdm_var_lib_t' /etc/selinux/targeted/contexts/files/file_contexts.local
 matchpathcon /var/lib/noctalia-greeter /var/lib/noctalia-greeter/sync.toml || true
 
-### Impronta digitale: il modo standard di Fedora (authselect), con due eccezioni
-# L'impronta vale per tutto ciò che usa system-auth (sudo, su, polkit). Il greeter e il servizio PAM "login"
-# (la password del blocco schermo di Noctalia) usano invece password-auth, che authselect lascia senza
-# pam_fprintd: al greeter serve la password per sbloccare il portachiavi, e il blocco schermo chiede
-# l'impronta per conto suo direttamente a fprintd.
+### Fingerprint: the standard Fedora way (authselect), with two exceptions
+# The fingerprint works for everything that uses system-auth (sudo, su, polkit). The greeter and the "login" PAM
+# service (the password of the Noctalia lock screen) use password-auth instead, which authselect leaves without
+# pam_fprintd: the greeter needs the password to unlock the keyring, and the lock screen asks fprintd for the
+# fingerprint directly, on its own.
 authselect enable-feature with-fingerprint
 grep -q pam_fprintd /etc/authselect/system-auth
 if grep -q pam_fprintd /etc/authselect/password-auth; then echo "pam_fprintd in password-auth" >&2; exit 1; fi
@@ -153,68 +153,69 @@ sed -i -E 's/^(auth[[:space:]]+substack[[:space:]]+)system-auth$/\1password-auth
 grep -q -E '^auth[[:space:]]+substack[[:space:]]+password-auth$' /etc/pam.d/greetd
 grep -q -E '^auth[[:space:]]+substack[[:space:]]+password-auth$' /etc/pam.d/login
 
-### Firma: bootc accetta aculOs solo se firmata con la chiave del repo (cosign.pub)
-# Stessa regola che la base usa per le immagini di Universal Blue. Dopo l'installazione (che scarica
-# l'immagine senza verificarla) il kickstart passa a questa con bootc switch --enforce-container-sigpolicy.
+### Signature: bootc accepts aculOs only if signed with the repo key (cosign.pub)
+# Same rule the base uses for the Universal Blue images. After the installation (which pulls the image
+# without verifying it) the kickstart switches to it with bootc switch --enforce-container-sigpolicy.
 install -D -m 644 /ctx/cosign.pub /etc/pki/containers/aculos.pub
-python3 -I - <<'FINE'
+python3 -I - <<'EOF'
 import json
 p = "/etc/containers/policy.json"
 with open(p) as f:
-    politica = json.load(f)
+    policy = json.load(f)
 # GHCR, and Quay as the second registry (same image, signed there with the same key)
 for repo in ("ghcr.io/olac-acul/aculos", "quay.io/olac-acul/aculos"):
-    politica["transports"]["docker"][repo] = [{
+    policy["transports"]["docker"][repo] = [{
         "type": "sigstoreSigned",
         "keyPath": "/etc/pki/containers/aculos.pub",
         "signedIdentity": {"type": "matchRepository"},
     }]
 with open(p, "w") as f:
-    json.dump(politica, f, indent=4)
+    json.dump(policy, f, indent=4)
     f.write("\n")
-FINE
+EOF
 grep -q '"ghcr.io/olac-acul/aculos"' /etc/containers/policy.json
 grep -q '"quay.io/olac-acul/aculos"' /etc/containers/policy.json
 
-### Noctalia come servizio utente legato alla sessione di niri
-# Il servizio è quello fornito da Noctalia, con il WantedBy per niri attivato.
+### Noctalia as a user service tied to the niri session
+# The service is the one shipped by Noctalia, with the WantedBy for niri enabled.
 sed 's/^# WantedBy=niri.service$/WantedBy=niri.service/' \
     /usr/share/noctalia/assets/noctalia.service > /usr/lib/systemd/user/noctalia.service
 grep -q '^WantedBy=niri.service$' /usr/lib/systemd/user/noctalia.service
 systemctl --global enable noctalia.service
 
-### Configurazione predefinita di niri
+### Default niri configuration
 mkdir -p /etc/niri
 ln -sf /usr/share/aculos/niri/config.kdl /etc/niri/config.kdl
 
-### Estensioni dei browser, installate da sole (l'utente può disattivarle, non toglierle): Pywalfox (colori dei temi
-# di Noctalia, che le fa da host) e Bitwarden (gestore di password, per Vaultwarden). Non in Tor e Mullvad Browser.
-# Firefox legge /etc/firefox/policies; per LibreWolf le voci si aggiungono alle sue regole, senza toccare le altre.
+### Browser extensions, installed automatically (the user can disable them, not remove them): Pywalfox (colors of
+# the Noctalia themes, Noctalia acts as its host) and Bitwarden (password manager, for Vaultwarden). Not in Tor and
+# Mullvad Browser. Firefox reads /etc/firefox/policies; for LibreWolf the entries are added to its policies,
+# leaving the others alone.
 python3 -I - <<'PY'
 import json, os
 amo = "https://addons.mozilla.org/firefox/downloads/latest/{}/latest.xpi"
-estensioni = {
+extensions = {
     "pywalfox@frewacom.org": {"installation_mode": "normal_installed", "install_url": amo.format("pywalfox")},
     "{446900e4-71c2-419f-a6a7-df9c091e268b}": {"installation_mode": "normal_installed",
                                                "install_url": amo.format("bitwarden-password-manager")},
 }
 os.makedirs("/etc/firefox/policies", exist_ok=True)
-json.dump({"policies": {"ExtensionSettings": estensioni}}, open("/etc/firefox/policies/policies.json", "w"), indent=2)
+json.dump({"policies": {"ExtensionSettings": extensions}}, open("/etc/firefox/policies/policies.json", "w"), indent=2)
 p = "/usr/share/librewolf/distribution/policies.json"
 d = json.load(open(p))
-d["policies"].setdefault("ExtensionSettings", {}).update(estensioni)
+d["policies"].setdefault("ExtensionSettings", {}).update(extensions)
 json.dump(d, open(p, "w"), indent=2)
 os.makedirs("/etc/chromium/policies/managed", exist_ok=True)
-json.dump({"ExtensionSettings": {"nngceckbapebfimnlniiiahkandclblb": {   # Bitwarden dal Chrome Web Store
+json.dump({"ExtensionSettings": {"nngceckbapebfimnlniiiahkandclblb": {   # Bitwarden from the Chrome Web Store
     "installation_mode": "normal_installed", "update_url": "https://clients2.google.com/service/update2/crx"}}},
-    open("/etc/chromium/policies/managed/aculos-estensioni.json", "w"), indent=2)
+    open("/etc/chromium/policies/managed/aculos-extensions.json", "w"), indent=2)
 PY
 grep -q pywalfox /etc/firefox/policies/policies.json
 grep -q pywalfox /usr/share/librewolf/distribution/policies.json
 grep -q uBlock0 /usr/share/librewolf/distribution/policies.json
 
-### Chromium: i profili nuovi usano il tema GTK, così seguono i colori dei temi di Noctalia (che colora GTK).
-# Le preferenze iniziali sono un file del pacchetto chromium: si aggiunge solo la chiave, il resto resta di Fedora.
+### Chromium: new profiles use the GTK theme, so they follow the colors of the Noctalia themes (which color GTK).
+# The initial preferences are a file of the chromium package: only the key is added, the rest stays as Fedora's.
 python3 -I - <<'PY'
 import json
 p = "/etc/chromium/master_preferences"
@@ -224,37 +225,37 @@ json.dump(d, open(p, "w"), indent=2)
 PY
 grep -q '"system_theme": 1' /etc/chromium/master_preferences
 
-### Shell: zsh per i nuovi utenti (lo .zshrc di /etc/skel carica i default di /usr/share/aculos/zsh)
+### Shell: zsh for new users (the .zshrc in /etc/skel loads the defaults from /usr/share/aculos/zsh)
 sed -i 's|^SHELL=.*|SHELL=/usr/bin/zsh|' /etc/default/useradd
 grep -q '^SHELL=/usr/bin/zsh$' /etc/default/useradd
 
-### Servizi di sistema
+### System services
 systemctl enable greetd.service
 systemctl enable aculos-greeter-setup.service
 systemctl enable tailscaled.service
 systemctl enable tuned.service tuned-ppd.service
-systemctl enable aculos-impronta-coperchio.service
+systemctl enable aculos-fingerprint-lid.service
 systemctl enable aculos-flathub.service aculos-flatpak-update.timer
 systemctl enable aculos-snapper-home.service snapper-timeline.timer snapper-cleanup.timer
-# Servizi utente: partono solo se l'utente ha la loro configurazione in ~/.config/aculos (vedi le unità)
+# User services: they start only if the user has their configuration in ~/.config/aculos (see the units)
 systemctl --global enable syncthing.service aculos-ntfy.service aculos-receive.service kanshi.service
 systemctl --global enable aculos-update-notify.service aculos-update-notify.path
-# Il timer utente di GRUB "boot riuscito" qui non serve e fallisce a ogni sessione: la configurazione statica di
-# bootupd non usa boot_success, e /boot è montato in sola lettura (visto in VM il 23/11).
+# GRUB's "boot succeeded" user timer is not needed here and fails at every session: bootupd's static configuration
+# does not use boot_success, and /boot is mounted read-only (seen in the VM on Nov 23).
 systemctl --global disable grub-boot-success.timer
 systemctl --global mask grub-boot-success.timer
 systemctl set-default graphical.target
-# Il login grafico è greetd su tty1: niente getty sullo stesso terminale
+# The graphical login is greetd on tty1: no getty on the same terminal
 systemctl disable getty@tty1.service || true
 
-### Versioni dei componenti principali, per sapere quale build si sta usando
+### Versions of the main components, to know which build is in use
 mkdir -p /usr/share/aculos
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
     noctalia-nightly noctalia-greeter niri greetd kitty tailscale fprintd tuned-ppd syncthing \
-    firefox chromium librewolf codium mark-flowy starship kanshi wl-mirror ax86-terminus-ttf-fonts papirus-icon-theme > /usr/share/aculos/versioni.txt
-cat /usr/share/aculos/versioni.txt
+    firefox chromium librewolf codium mark-flowy starship kanshi wl-mirror ax86-terminus-ttf-fonts papirus-icon-theme > /usr/share/aculos/versions.txt
+cat /usr/share/aculos/versions.txt
 
-### Pulizia: niente resti in /run e /var (bootc container lint)
-# /var/lib/noctalia-greeter lo riempie il %post del pacchetto durante la build: si svuota, così lo prepara
-# aculos-greeter-setup.service al primo avvio, sul sistema vero.
+### Cleanup: no leftovers in /run and /var (bootc container lint)
+# /var/lib/noctalia-greeter is filled by the package's %post during the build: empty it, so that
+# aculos-greeter-setup.service prepares it at first boot, on the real system.
 rm -rf /run/dnf /run/selinux-policy /run/tuned /var/lib/dnf /var/lib/noctalia-greeter

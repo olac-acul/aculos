@@ -1,0 +1,111 @@
+#!/usr/bin/python3 -I
+"""Disconnects the fingerprint reader while the lid is closed and reconnects it when the lid opens.
+
+With the lid closed the reader cannot be used: once it is disconnected (authorized=0 on the USB device) fprintd no
+longer sees it, and sudo, polkit and the lock screen go straight to the password instead of waiting for a finger.
+Readers are recognized from libfprint's list of USB devices (its hwdb), the lid from the "Lid Switch" input
+device. Without a lid the program exits without doing anything; it looks for readers at every opening and closing,
+so it also works for a reader that appears after boot.
+
+Usage: fingerprint-lid           service (aculos-fingerprint-lid.service)
+       fingerprint-lid --test    show readers and lid state, without changing anything
+"""
+import fcntl
+import glob
+import os
+import re
+import signal
+import struct
+import sys
+
+EV_SW, SW_LID = 0x05, 0x00
+EVENT = struct.Struct("llHHi")  # struct input_event (64 bit)
+EVIOCGSW = (2 << 30) | (8 << 16) | (ord("E") << 8) | 0x1B  # switch states, 8-byte buffer
+
+
+def reader_ids():
+    ids = set()
+    for f in glob.glob("/usr/lib/udev/hwdb.d/*libfprint*.hwdb"):
+        with open(f) as h:
+            for line in h:
+                m = re.match(r"usb:v([0-9A-Fa-f]{4})p([0-9A-Fa-f]{4})\*", line.strip())
+                if m:
+                    ids.add((m[1].lower(), m[2].lower()))
+    return ids
+
+
+def readers(ids):
+    found = []
+    for d in glob.glob("/sys/bus/usb/devices/*"):
+        try:
+            with open(d + "/idVendor") as v, open(d + "/idProduct") as p:
+                if (v.read().strip(), p.read().strip()) in ids:
+                    found.append(d)
+        except OSError:
+            pass
+    return found
+
+
+def lid():
+    for d in glob.glob("/sys/class/input/event*"):
+        try:
+            with open(d + "/device/name") as n:
+                if n.read().strip() == "Lid Switch":
+                    return "/dev/input/" + os.path.basename(d)
+        except OSError:
+            pass
+    return None
+
+
+def is_closed(fd):
+    buf = bytearray(8)
+    fcntl.ioctl(fd, EVIOCGSW, buf)
+    return bool(buf[0] & (1 << SW_LID))
+
+
+def set_readers(ids, enabled):
+    for d in readers(ids):
+        try:
+            with open(d + "/authorized", "w") as a:
+                a.write("1" if enabled else "0")
+            print(f"{d}: {'reconnected' if enabled else 'disconnected'}", flush=True)
+        except OSError as e:
+            print(f"{d}: {e}", file=sys.stderr, flush=True)
+
+
+def main():
+    test = "--test" in sys.argv[1:]
+    ids = reader_ids()
+    ev = lid()
+    if test:
+        print("models known to libfprint:", len(ids))
+        print("readers:", readers(ids) or "none")
+        print("lid:", ev or "none")
+    if not ev:
+        if not test:
+            print("No lid: exiting.", flush=True)
+        return 0
+    fd = os.open(ev, os.O_RDONLY)
+    closed = is_closed(fd)
+    if test:
+        print("state:", "closed" if closed else "open")
+        return 0
+
+    # On exit the reader is always reconnected
+    def leave(*_):
+        set_readers(ids, True)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, leave)
+    signal.signal(signal.SIGINT, leave)
+    set_readers(ids, not closed)
+    while True:
+        data = os.read(fd, EVENT.size * 64)
+        for i in range(0, len(data) - EVENT.size + 1, EVENT.size):
+            _, _, ev_type, code, value = EVENT.unpack_from(data, i)
+            if ev_type == EV_SW and code == SW_LID:
+                set_readers(ids, value == 0)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

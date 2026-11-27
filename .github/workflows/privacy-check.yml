@@ -1,0 +1,48 @@
+---
+name: Privacy check
+# Searches the repo for words that must not be public. The list is in the FORBIDDEN_WORDS secret (one extended
+# regular expression per line), so it does not appear in the repo. Prints only file and line, never the text.
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Search for forbidden words
+        env:
+          FORBIDDEN_WORDS: ${{ secrets.FORBIDDEN_WORDS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FORBIDDEN_WORDS}" ]; then
+            echo "::error::The FORBIDDEN_WORDS secret is missing"
+            exit 1
+          fi
+          patterns="$(mktemp)"
+          printf '%s\n' "${FORBIDDEN_WORDS}" | grep -v -e '^#' -e '^[[:space:]]*$' > "${patterns}"
+          found=0
+          # Current files
+          if git grep -n -I -E -f "${patterns}" -- . > /tmp/results; then
+            cut -d: -f1,2 /tmp/results | sed 's/^/::error::forbidden word in /'
+            found=1
+          fi
+          # Commit messages and emails (not names: the template's first commit carries the account name)
+          if git log --format='%ae %ce%n%B' | grep -q -E -f "${patterns}"; then
+            echo "::error::forbidden word in a commit message or email"
+            found=1
+          fi
+          exit "${found}"

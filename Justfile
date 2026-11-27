@@ -171,8 +171,8 @@ ostree-rechunk $target_image=image_name $tag=default_tag:
     # Use the already-built local image to avoid pulling from a remote registry
     RPM_OSTREE_CHUNKER_IMAGE="localhost/${target_image}:${tag}"
 
-    # rpm-ostree con --rootfs non copia le etichette: si salvano qui e si rimettono alla fine
-    mapfile -t ETICHETTE < <(podman image inspect "localhost/${target_image}:${tag}" \
+    # rpm-ostree with --rootfs does not copy the labels: save them here and put them back at the end
+    mapfile -t LABELS < <(podman image inspect "localhost/${target_image}:${tag}" \
       | jq -r '.[0].Labels // {} | to_entries[] | select(.key | startswith("ostree.") | not) | "\(.key)=\(.value)"')
 
     GRAPHROOT="$(podman info --format '{{ '{{.Store.GraphRoot}}' }}')"
@@ -190,15 +190,15 @@ ostree-rechunk $target_image=image_name $tag=default_tag:
       --rootfs /rpm-ostree \
       --output "containers-storage:[overlay@/run/host-container-storage+/run/rpm-ostree-storage]localhost/${target_image}:${tag}"
 
-    # Etichette di prima più le versioni dei componenti di aculOs (da /usr/share/aculos/versioni.txt).
-    # Un Containerfile con solo FROM non aggiunge strati: cambia solo la configurazione dell'immagine.
-    ARGOMENTI=()
-    for e in "${ETICHETTE[@]}"; do ARGOMENTI+=(--label "$e"); done
-    while read -r nome versione; do
-      ARGOMENTI+=(--label "aculos.versione.${nome}=${versione}")
-    done < <(podman run --rm --pull=never --entrypoint cat "localhost/${target_image}:${tag}" /usr/share/aculos/versioni.txt)
+    # The previous labels plus the versions of the aculOs components (from /usr/share/aculos/versions.txt).
+    # A Containerfile with only FROM adds no layers: it changes only the image configuration.
+    ARGS=()
+    for e in "${LABELS[@]}"; do ARGS+=(--label "$e"); done
+    while read -r name version; do
+      ARGS+=(--label "aculos.version.${name}=${version}")
+    done < <(podman run --rm --pull=never --entrypoint cat "localhost/${target_image}:${tag}" /usr/share/aculos/versions.txt)
     echo "FROM localhost/${target_image}:${tag}" \
-      | podman build --pull=never "${ARGOMENTI[@]}" --tag "localhost/${target_image}:${tag}" --file - .
+      | podman build --pull=never "${ARGS[@]}" --tag "localhost/${target_image}:${tag}" --file - .
 
 # Generate Default Tag
 [group('Utility')]

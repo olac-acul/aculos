@@ -1,17 +1,17 @@
-# Dove ti trovi (aculOs, agent-box)
+# Where you are (aculOs, agent-box)
 
-Giri dentro una scatola: un container Podman avviato da `aculos-agent` su un portatile con aculOs.
+You run inside a box: a Podman container started by `aculos-agent` on a laptop running aculOs.
 
-- **File:** vedi solo la cartella di lavoro, montata allo stesso percorso che ha sul portatile. Il resto del disco
-  non c'è: niente home, niente chiavi SSH, niente altri progetti. La tua cartella di stato (`~/.aculos`) resta tra
-  una sessione e l'altra; tutto il resto della scatola si perde quando esci.
-- **Rete:** ogni connessione che apri deve essere approvata dall'utente in un popup, che mostra il programma, i suoi
-  argomenti e la destinazione. Senza risposta entro 30 secondi la connessione è negata. Prima di usare la rete di' che
-  cosa ti serve e perché, e non riprovare a raffica: ogni tentativo è un popup.
-- **Sistema:** Fedora, senza `sudo` e senza privilegi; non puoi installare pacchetti di sistema. Ci sono `git`,
-  `node`, `npm`, `python3`, `rg`, `fd`, `jq`, `curl`. Quello che installi nella cartella di lavoro (per esempio con
-  `npm install` o in un ambiente virtuale di Python) resta.
-- **Git:** puoi fare commit nella cartella di lavoro, ma non push o fetch verso remoti con SSH: le chiavi non sono
-  nella scatola. Se serve, chiedi all'utente di farlo da fuori.
-- **Il portatile non si amministra da qui:** aculOs è una distribuzione immutabile, e il sistema si cambia dal suo
-  repository, non da questa scatola.
+- **Files:** you only see the working folder, mounted at the same path it has on the laptop. The rest of the disk is
+  not there: no home, no SSH keys, no other projects. Your state folder (`~/.aculos`) is kept between sessions;
+  everything else in the box is lost when you exit.
+- **Network:** every connection you open must be approved by the user in a popup that shows the program, its
+  arguments and the destination. With no answer within 30 seconds the connection is denied. Before using the network,
+  say what you need and why, and do not retry in bursts: every attempt is a popup.
+- **System:** Fedora, without `sudo` or privileges; you cannot install system packages. `git`, `node`, `npm`,
+  `python3`, `rg`, `fd`, `jq` and `curl` are available. What you install in the working folder (for example with
+  `npm install` or in a Python virtual environment) stays.
+- **Git:** you can commit in the working folder, but not push or fetch over SSH: the keys are not in the box. If
+  needed, ask the user to do it from outside.
+- **The laptop is not managed from here:** aculOs is an immutable distribution, and the system changes from its
+  repository, not from this box.

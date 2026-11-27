@@ -11,8 +11,8 @@
       "automerge": true,
       "matchUpdateTypes": ["pin", "pinDigest"]
     },
-    // base-main segue il tag della versione di Fedora (45): niente digest fissato,
-    // così la build di ogni giorno prende la base aggiornata
+    // base-main follows the Fedora version tag (45): no pinned digest,
+    // so the daily build picks up the updated base
     {
       "matchDatasources": ["docker"],
       "matchPackageNames": ["ghcr.io/ublue-os/base-main"],

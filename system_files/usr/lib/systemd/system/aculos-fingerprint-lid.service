@@ -1,9 +1,9 @@
 [Unit]
-Description=Lettore di impronte staccato a coperchio chiuso
+Description=Disconnect the fingerprint reader while the lid is closed
 After=systemd-udev-trigger.service
 
 [Service]
-ExecStart=/usr/libexec/aculos/impronta-coperchio
+ExecStart=/usr/libexec/aculos/fingerprint-lid
 Restart=on-failure
 RestartSec=5
 

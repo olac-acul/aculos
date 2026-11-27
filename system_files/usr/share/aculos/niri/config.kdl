@@ -1,7 +1,7 @@
-// Configurazione di niri predefinita di aculOs (fase 2): quella di niri 26.04 con poche modifiche
-// (kitty, Noctalia per launcher, blocco, volume e luminosità; regole per Noctalia in fondo).
-// Sta in /usr/share/aculos/niri/config.kdl, /etc/niri/config.kdl punta qui.
-// La configurazione personale in ~/.config/niri/config.kdl, se c'è, ha la precedenza.
+// Default niri configuration of aculOs (phase 2): the one from niri 26.04 with a few changes
+// (kitty, Noctalia for launcher, lock, volume and brightness; rules for Noctalia at the bottom).
+// It lives in /usr/share/aculos/niri/config.kdl, /etc/niri/config.kdl points here.
+// The personal configuration in ~/.config/niri/config.kdl, if present, takes precedence.
 
 // This config is in the KDL format: https://kdl.dev
 // "/-" comments out the following node.
@@ -272,12 +272,12 @@ layout {
 // which may be more convenient to use.
 // See the binds section below for more spawn examples.
 
-// aculOs: Noctalia parte come servizio utente systemd (noctalia.service, legato a niri.service),
-// quindi qui non serve spawn-at-startup.
+// aculOs: Noctalia starts as a systemd user service (noctalia.service, tied to niri.service),
+// so spawn-at-startup is not needed here.
 
-// aculOs: al primo accesso di un account nuovo (finché non ci sono i dotfiles) apre il terminale con aculos-setup.
-// Non fa nulla se la configurazione è già stata fatta o rifiutata. Questa configurazione vale solo finché l'utente
-// non ne ha una sua in ~/.config/niri.
+// aculOs: at the first login of a new account (until the dotfiles are in place) opens the terminal with aculos-setup.
+// Does nothing if the setup has already been done or declined. This configuration applies only until the user
+// has their own in ~/.config/niri.
 spawn-sh-at-startup "aculos-setup --welcome"
 
 // To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
@@ -644,7 +644,7 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 }
 
-// aculOs: integrazione con Noctalia (dalla documentazione di Noctalia per niri)
+// aculOs: integration with Noctalia (from the Noctalia documentation for niri)
 window-rule {
     match app-id="dev.noctalia.Noctalia"
     open-floating true
@@ -653,6 +653,6 @@ window-rule {
 }
 
 debug {
-    // Permette a Noctalia di attivare finestre dalle notifiche.
+    // Lets Noctalia activate windows from notifications.
     honor-xdg-activation-with-invalid-serial
 }

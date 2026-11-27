@@ -1,6 +1,6 @@
 [Unit]
-Description=Prepara la configurazione di noctalia-greeter (primo avvio)
-# Crea greeter.toml e sync.toml in /var/lib/noctalia-greeter, una volta sola
+Description=Prepare the noctalia-greeter configuration (first boot)
+# Creates greeter.toml and sync.toml in /var/lib/noctalia-greeter, only once
 ConditionPathExists=!/var/lib/noctalia-greeter/greeter.toml
 After=systemd-sysusers.service systemd-tmpfiles-setup.service
 Before=greetd.service

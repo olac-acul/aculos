@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <zone target="ACCEPT">
   <short>VPN</short>
-  <description>Interfaccia di Tailscale (tailscale0). Accetta tutto: chi può raggiungere il portatile lo decidono le ACL del server di coordinamento (Headscale). Serve anche per Taildrop, che riceve su una porta che cambia.</description>
+  <description>Tailscale interface (tailscale0). Accepts everything: who can reach the laptop is decided by the ACLs of the coordination server (Headscale). Also needed for Taildrop, which receives on a port that changes.</description>
   <interface name="tailscale0"/>
 </zone>
