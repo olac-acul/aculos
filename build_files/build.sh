@@ -264,14 +264,19 @@ rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
     firefox chromium librewolf codium mark-flowy starship kanshi wl-mirror ax86-terminus-ttf-fonts papirus-icon-theme > /usr/share/aculos/versions.txt
 cat /usr/share/aculos/versions.txt
 
-### Boot splash: the aculOs Plymouth theme (/usr/share/plymouth/themes/aculos). The theme lives in the initramfs, so
-### the initramfs is built again, last, with the image's own dracut settings (dracut.conf.d: ostree and bootc
-### modules, no hostonly). If the new initramfs does not boot, "bootc rollback" goes back to the previous image.
+### Boot splash: the aculOs Plymouth theme (/usr/share/plymouth/themes/aculos), an animation written for Plymouth's
+### script plugin. The theme lives in the initramfs, so the initramfs is built again, last, with the image's own dracut
+### settings (dracut.conf.d: ostree and bootc modules, no hostonly). If the new initramfs does not boot,
+### "bootc rollback" goes back to the previous image.
+dnf5 -y install plymouth-plugin-script
 plymouth-set-default-theme aculos
 kver=$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' | tail -n 1)
 dracut --force --kver "$kver" "/usr/lib/modules/$kver/initramfs.img"
 chmod 0600 "/usr/lib/modules/$kver/initramfs.img"
-lsinitrd "/usr/lib/modules/$kver/initramfs.img" | grep 'plymouth/themes/aculos/aculos.plymouth'
+lsinitrd "/usr/lib/modules/$kver/initramfs.img" > /tmp/initramfs.list   # the theme and its plugin must be inside
+grep 'plymouth/themes/aculos/aculos.script' /tmp/initramfs.list
+grep 'plymouth/script.so' /tmp/initramfs.list
+rm /tmp/initramfs.list
 
 ### Cleanup: no leftovers in /run and /var (bootc container lint)
 # /var/lib/noctalia-greeter is filled by the package's %post during the build: empty it, so that

@@ -1,65 +1,11 @@
 [Plymouth Theme]
 Name=aculOs
-Description=The aculOs logo on black with a blinking block cursor; square password box.
-ModuleName=two-step
+Description=The aculOs logo typed letter by letter on black, then a blinking block cursor; square password box.
+ModuleName=script
 
-# Images (generated on the logo's pixel grid, 8 px per cell):
-#   watermark.png      the logo, with room for the cursor
-#   throbber-*.png     the block cursor after the logo, on for half the frames (same size and place as the
-#   animation-*.png    watermark, so it lands right after the "s")
-#   entry.png, bullet.png, lock.png   the password box
+# The animation and the password box are in aculos.script. Images are generated on the logo's pixel grid
+# (8 px per cell): logo-K.png (the first K letters), cursor.png, entry.png, bullet.png, lock.png.
 # Text (messages, the password prompt) uses the default font: in the initramfs the label plugin has no other.
-[two-step]
+[script]
 ImageDir=/usr/share/plymouth/themes/aculos
-HorizontalAlignment=.5
-VerticalAlignment=.45
-WatermarkHorizontalAlignment=.5
-WatermarkVerticalAlignment=.45
-DialogHorizontalAlignment=.5
-DialogVerticalAlignment=.6
-TitleHorizontalAlignment=.5
-TitleVerticalAlignment=.3
-Transition=none
-TransitionDuration=0.0
-BackgroundStartColor=0x000000
-BackgroundEndColor=0x000000
-ProgressBarBackgroundColor=0x303030
-ProgressBarForegroundColor=0xffff55
-MessageBelowAnimation=true
-
-[boot-up]
-UseEndAnimation=false
-
-[shutdown]
-UseEndAnimation=false
-
-[reboot]
-UseEndAnimation=false
-
-[updates]
-SuppressMessages=true
-ProgressBarShowPercentComplete=true
-UseProgressBar=true
-Title=Installing updates...
-SubTitle=Do not turn off your computer
-
-[system-upgrade]
-SuppressMessages=true
-ProgressBarShowPercentComplete=true
-UseProgressBar=true
-Title=Upgrading the system...
-SubTitle=Do not turn off your computer
-
-[firmware-upgrade]
-SuppressMessages=true
-ProgressBarShowPercentComplete=true
-UseProgressBar=true
-Title=Upgrading firmware...
-SubTitle=Do not turn off your computer
-
-[system-reset]
-SuppressMessages=true
-ProgressBarShowPercentComplete=true
-UseProgressBar=true
-Title=Resetting the system...
-SubTitle=Do not turn off your computer
+ScriptFile=/usr/share/plymouth/themes/aculos/aculos.script

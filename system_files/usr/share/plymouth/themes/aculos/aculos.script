@@ -1,0 +1,117 @@
+// aculOs boot splash (Plymouth script plugin).
+// The logo is typed letter by letter, with a block cursor in front of it; then the cursor stays after the "s" and
+// blinks until the end. The password box (disk encryption) and messages appear below the logo.
+// refresh() runs 50 times a second: times below are in refresh ticks.
+
+START = 15;    // ticks before the first letter
+STEP = 7;      // ticks per letter
+BLINK = 25;    // ticks the cursor stays on, then off
+
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+for (k = 0; k <= 6; k++)
+    logo_image[k] = Image("logo-" + k + ".png");
+// cursor position (pixels from the logo's left edge) after k letters: one empty cell after the last letter
+cursor_x[0] = 0; cursor_x[1] = 48; cursor_x[2] = 96; cursor_x[3] = 144;
+cursor_x[4] = 176; cursor_x[5] = 240; cursor_x[6] = 288;
+cursor_image = Image("cursor.png");
+
+// logo plus final cursor, centred a little above the middle of the screen
+group_width = cursor_x[6] + cursor_image.GetWidth();
+base_x = Window.GetX() + Window.GetWidth() / 2 - group_width / 2;
+base_y = Window.GetY() + Window.GetHeight() * 0.45 - logo_image[6].GetHeight() / 2;
+
+logo = Sprite(logo_image[0]);
+logo.SetPosition(base_x, base_y, 1);
+cursor = Sprite(cursor_image);
+cursor.SetPosition(base_x, base_y + 16, 2);   // the cursor is as tall as the lowercase letters (rows 2-6)
+
+global.tick = 0;
+global.shown = 0;
+
+fun refresh() {
+    global.tick++;
+    k = Math.Int((global.tick - global.START) / global.STEP);
+    if (global.tick < global.START) k = 0;
+    if (k > 6) k = 6;
+    if (k != global.shown) {
+        global.logo.SetImage(global.logo_image[k]);
+        global.shown = k;
+    }
+    global.cursor.SetX(global.base_x + global.cursor_x[k]);
+    if (k < 6) {
+        global.cursor.SetOpacity(1);
+    } else {
+        phase = global.tick - Math.Int(global.tick / (2 * global.BLINK)) * 2 * global.BLINK;
+        if (phase < global.BLINK) global.cursor.SetOpacity(1);
+        else global.cursor.SetOpacity(0);
+    }
+}
+Plymouth.SetRefreshFunction(refresh);
+
+// Password box: prompt text, square entry, one yellow square per typed character, a padlock on the left
+entry_image = Image("entry.png");
+bullet_image = Image("bullet.png");
+lock_image = Image("lock.png");
+entry_x = base_x;
+entry_y = Window.GetY() + Window.GetHeight() * 0.6;
+entry = Sprite(entry_image);
+entry.SetPosition(entry_x, entry_y, 3);
+entry.SetOpacity(0);
+lock = Sprite(lock_image);
+lock.SetPosition(entry_x - lock_image.GetWidth() - 12, entry_y + (entry_image.GetHeight() - lock_image.GetHeight()) / 2, 3);
+lock.SetOpacity(0);
+prompt = Sprite();
+prompt.SetOpacity(0);
+max_bullets = Math.Int((entry_image.GetWidth() - 24) / 14);
+
+fun show_dialog(text, bullets) {
+    global.entry.SetOpacity(1);
+    global.lock.SetOpacity(1);
+    prompt_image = Image.Text(text, 0.91, 0.91, 0.91);
+    global.prompt.SetImage(prompt_image);
+    global.prompt.SetPosition(Window.GetX() + Window.GetWidth() / 2 - prompt_image.GetWidth() / 2, global.entry_y - prompt_image.GetHeight() - 12, 3);
+    global.prompt.SetOpacity(1);
+    for (i = 0; i < global.max_bullets; i++) {
+        if (!global.bullet[i]) {
+            global.bullet[i] = Sprite(global.bullet_image);
+            global.bullet[i].SetPosition(global.entry_x + 12 + i * 14, global.entry_y + (global.entry_image.GetHeight() - global.bullet_image.GetHeight()) / 2, 4);
+        }
+        if (i < bullets) global.bullet[i].SetOpacity(1);
+        else global.bullet[i].SetOpacity(0);
+    }
+}
+
+fun hide_dialog() {
+    global.entry.SetOpacity(0);
+    global.lock.SetOpacity(0);
+    global.prompt.SetOpacity(0);
+    for (i = 0; i < global.max_bullets; i++)
+        if (global.bullet[i]) global.bullet[i].SetOpacity(0);
+}
+
+fun display_password(text, bullets) {
+    show_dialog(text, bullets);
+}
+Plymouth.SetDisplayPasswordFunction(display_password);
+
+fun display_question(text, answer) {
+    show_dialog(text + " " + answer, 0);
+}
+Plymouth.SetDisplayQuestionFunction(display_question);
+
+fun display_normal() {
+    hide_dialog();
+}
+Plymouth.SetDisplayNormalFunction(display_normal);
+
+// Messages (for example during updates) under the logo
+message = Sprite();
+message.SetPosition(0, 0, 3);
+fun show_message(text) {
+    message_image = Image.Text(text, 0.6, 0.6, 0.6);
+    global.message.SetImage(message_image);
+    global.message.SetPosition(Window.GetX() + Window.GetWidth() / 2 - message_image.GetWidth() / 2, Window.GetY() + Window.GetHeight() * 0.75, 3);
+}
+Plymouth.SetMessageFunction(show_message);
