@@ -264,6 +264,15 @@ rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
     firefox chromium librewolf codium mark-flowy starship kanshi wl-mirror ax86-terminus-ttf-fonts papirus-icon-theme > /usr/share/aculos/versions.txt
 cat /usr/share/aculos/versions.txt
 
+### Boot splash: the aculOs Plymouth theme (/usr/share/plymouth/themes/aculos). The theme lives in the initramfs, so
+### the initramfs is built again, last, with the image's own dracut settings (dracut.conf.d: ostree and bootc
+### modules, no hostonly). If the new initramfs does not boot, "bootc rollback" goes back to the previous image.
+plymouth-set-default-theme aculos
+kver=$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' | tail -n 1)
+dracut --force --kver "$kver" "/usr/lib/modules/$kver/initramfs.img"
+chmod 0600 "/usr/lib/modules/$kver/initramfs.img"
+lsinitrd "/usr/lib/modules/$kver/initramfs.img" | grep 'plymouth/themes/aculos/aculos.plymouth'
+
 ### Cleanup: no leftovers in /run and /var (bootc container lint)
 # /var/lib/noctalia-greeter is filled by the package's %post during the build: empty it, so that
 # aculos-greeter-setup.service prepares it at first boot, on the real system.
