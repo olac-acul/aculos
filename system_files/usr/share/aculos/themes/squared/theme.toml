@@ -1,0 +1,57 @@
+# "Squared" theme (the default): the shapes of Blue DOS (Terminus, everything square and flat) with colours taken
+# from the wallpaper. The colours of niri, kitty, GTK and Firefox come from Noctalia's templates.
+# A user wallpaper.* in ~/.config/aculos/themes/squared/ replaces the stock one (see aculos theme --help).
+description = "default: Blue DOS shapes, colours from the wallpaper"
+wallpaper = "/usr/share/backgrounds/fedora-workstation/mermaid_dark.webp"
+font = "Terminus (TTF)"
+
+# Icons from the wallpaper (mean brightness): light ones on a dark wallpaper, dark ones on a light one. Chosen again
+# by "aculos theme --icons", run by Noctalia ("aculos-icons" template) when the wallpaper changes.
+[icons]
+dark_wallpaper = "Papirus-Light"
+light_wallpaper = "Papirus-Dark"
+
+[gtk]
+font = "Terminus (TTF) 11"        # font of GTK apps
+
+# prompt arrow in the palette's main colour (green in Noctalia's terminal colours)
+[prompt]
+color = "bold green"
+
+[noctalia]
+"theme.source" = "wallpaper"
+"theme.wallpaper_scheme" = "m3-tonal-spot"
+"theme.templates.enable_builtin_templates" = true
+"theme.templates.builtin_ids" = ["kitty", "gtk3", "gtk4", "niri", "btop"]
+"theme.templates.enable_community_templates" = true
+"theme.templates.community_ids" = ["pywalfox", "micro", "bat", "fzf", "vscode"]
+"shell.font_family" = "Terminus (TTF)"
+"shell.corner_radius_scale" = 0.0
+"shell.popup_shadows" = false
+# semi-transparent panels over the blurred wallpaper, like kitty
+"shell.panel.transparency_mode" = "soft"
+"shell.panel.shadow" = false
+"bar.default.font_family" = "Terminus (TTF)"
+"bar.default.background_opacity" = 1.0
+"bar.default.margin_ends" = 0
+"bar.default.margin_edge" = 0
+"bar.default.border_width" = 1.0
+"bar.default.radius" = 0
+"bar.default.shadow" = false
+"bar.default.compositor_blur" = false
+"widget.workspaces.style" = "minimal"
+# black lock screen (solid black veil over the wallpaper): with the "crt" transition it looks like a monitor
+# switching off and on
+"lockscreen.blur_intensity" = 0.0
+"lockscreen.tint_color" = "#000000"
+"lockscreen.tint_intensity" = 1.0
+"wallpaper.fill_mode" = "crop"
+"wallpaper.fill_color" = "#000000"
+
+[kitty]
+font_family = "Terminus (TTF)"
+font_size = "13.0"
+cursor_shape = "block"
+window_padding_width = "6"
+# semi-transparent background (the text stays solid)
+background_opacity = "0.85"

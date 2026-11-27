@@ -1,0 +1,9 @@
+// "Rounded" theme for niri: a fixed light-blue focus ring, over the palette colours that Noctalia's "niri"
+// template writes to noctalia.kdl.
+layout {
+    focus-ring {
+        active-color "#7fc8ff"
+        inactive-color "#505050"
+        urgent-color "#9b0000"
+    }
+}

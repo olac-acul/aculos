@@ -1,0 +1,51 @@
+// "Blue DOS" theme for niri (copied by aculos theme to cfg/theme.kdl, included last by config.kdl).
+// Colours of Noctalia's BlueDOS palette: yellow = active, blue = inactive, red = urgent.
+layout {
+    gaps 8
+
+    // Only the border, solid and square: no focus ring, no shadows
+    focus-ring {
+        off
+    }
+    border {
+        on
+        width 2
+        active-color "#ffff55"
+        inactive-color "#5555ff"
+        urgent-color "#ff5555"
+    }
+    shadow {
+        off
+    }
+
+    // Tabs (tabbed columns) and insert hint in the palette's colours
+    tab-indicator {
+        active-color "#ffff55"
+        inactive-color "#5555ff"
+        urgent-color "#ff5555"
+        corner-radius 0
+    }
+    insert-hint {
+        color "#55ffff80"
+    }
+}
+
+// Square corners for every window (replaces the radius 8 of rules.kdl)
+window-rule {
+    geometry-corner-radius 0
+    clip-to-geometry true
+}
+
+// Recent windows switcher (Alt+Tab) in the same yellow
+recent-windows {
+    highlight {
+        active-color "#ffff55"
+        urgent-color "#ff5555"
+        corner-radius 0
+    }
+}
+
+// Overview on night blue
+overview {
+    backdrop-color "#00002f"
+}

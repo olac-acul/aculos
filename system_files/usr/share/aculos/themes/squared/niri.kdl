@@ -1,0 +1,29 @@
+// "Squared" theme for niri: the shapes of Blue DOS. Colours come from the palette (noctalia.kdl, "niri" template).
+layout {
+    gaps 8
+
+    focus-ring {
+        off
+    }
+    border {
+        on
+        width 2
+    }
+    shadow {
+        off
+    }
+    tab-indicator {
+        corner-radius 0
+    }
+}
+
+window-rule {
+    geometry-corner-radius 0
+    clip-to-geometry true
+}
+
+recent-windows {
+    highlight {
+        corner-radius 0
+    }
+}

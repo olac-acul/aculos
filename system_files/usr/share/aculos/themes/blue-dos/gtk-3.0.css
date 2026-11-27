@@ -1,0 +1,5 @@
+/* "Blue DOS" theme for GTK 3 apps (adw-gtk3): everything square. Noctalia writes the colours (noctalia.css). */
+* {
+    border-radius: 0;
+    -gtk-outline-radius: 0;
+}

@@ -9,6 +9,8 @@ It is a personal project: choices follow one person's use and may change at any 
 ## What's inside
 
 - niri + Noctalia, with noctalia-greeter on greetd
+- `aculos` command for everyday tasks, also as a menu in the launcher (Mod+Space); `aculos theme` switches
+  between three desktop themes (squared, rounded, blue-dos) across Noctalia, niri, kitty, GTK apps and Firefox
 - Laptop tuning: fingerprint login, battery charge thresholds, tuned power profiles, zram
 - Tailscale, Syncthing, rootless Podman, snapshots of `/var/home` with snapper
 - `aculos-agent`: coding agents (pi, Claude Code, Codex) in a sandboxed container, with OpenSnitch asking before
@@ -34,6 +36,8 @@ cosign verify --key cosign.pub ghcr.io/olac-acul/aculos:latest
 - [Universal Blue image template](https://github.com/ublue-os/image-template), which this repository starts from
 - [niri](https://github.com/YaLTeR/niri), [Noctalia](https://github.com/noctalia-dev/noctalia-shell) and
   [Terra](https://terra.fyralabs.com/) for packages not in Fedora
+- The blue-dos theme is inspired by Hyprland-Desktop-Viola-Blu from
+  [RiccardoPP/dotfiles](https://github.com/RiccardoPP/dotfiles) (MIT, Copyright (c) 2024 Riccardo Palombo)
 
 ## License
 

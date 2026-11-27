@@ -1,0 +1,19 @@
+/* "Blue DOS" theme for Firefox: everything square. Colours come from the Pywalfox extension (Noctalia's "pywalfox"
+   template). The variables also reach inside components; the rule on * covers the rest of the interface. */
+:root, :host {
+    --border-radius-small: 0 !important;
+    --border-radius-medium: 0 !important;
+    --border-radius-large: 0 !important;
+    --border-radius-xlarge: 0 !important;
+    --border-radius-circle: 0 !important;
+    --button-border-radius: 0 !important;
+    --tab-border-radius: 0 !important;
+    --toolbarbutton-border-radius: 0 !important;
+    --arrowpanel-border-radius: 0 !important;
+    --panel-border-radius: 0 !important;
+    --urlbar-icon-border-radius: 0 !important;
+}
+
+* {
+    border-radius: 0 !important;
+}

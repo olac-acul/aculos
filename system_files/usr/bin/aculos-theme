@@ -1,0 +1,536 @@
+#!/usr/bin/python3 -I
+"""aculos-theme: switch the desktop look (Noctalia, niri, kitty, GTK, browsers) between the aculOs themes.
+
+Usage:
+  aculos theme               list the themes, marking the active one
+  aculos theme <name>        apply theme <name>, login screen included (asks for the admin password)
+  aculos theme --greeter     apply the active theme again, login screen included
+  aculos theme --wallpaper   put back the wallpaper of the active theme
+  aculos theme --icons       choose the icons again from the current wallpaper (run by Noctalia when it changes)
+  aculos theme --after-apply <name>   apply <name> again without the login screen, unless the theme changed
+                                      (for scripts that rewrite the dotfiles, like a chezmoi hook)
+
+The wallpaper: switching theme sets the theme's own; a wallpaper you pick afterwards (in Noctalia) stays until you
+switch theme or run "aculos theme --wallpaper".
+
+Themes come from /usr/share/aculos/themes/<name>/ (shipped with the image) and ~/.config/aculos/themes/<name>/
+(yours). The two folders are merged file by file and yours wins: a theme of your own needs only its folder, and
+to change one file of a shipped theme put just that file in your folder. A wallpaper.* in your folder replaces the
+theme's wallpaper.
+
+A theme folder holds:
+  theme.toml  description, wallpaper, Noctalia palette, icons, GTK font, prompt colour, Noctalia and kitty settings.
+              Icons: [icons] theme = "<name>" (fixed), or dark_wallpaper/light_wallpaper = "<name>" to pick them
+              from the wallpaper's mean brightness; folders = "<colour>" for coloured Papirus folders
+  wallpaper.* (optional) the theme's wallpaper
+  niri.kdl    (optional) window borders, corners and colours: becomes ~/.config/niri/cfg/theme.kdl
+  gtk-3.0.css, gtk-4.0.css  (optional) rules for GTK apps: become ~/.config/gtk-*/theme.css, imported by gtk.css
+              (running apps pick them up when restarted)
+  firefox.css (optional) rules for the Firefox and LibreWolf interface: becomes chrome/theme.css in every profile,
+              imported by userChrome.css (picked up on restart). Colours come from the Pywalfox extension with
+              Noctalia's "pywalfox" template; theme registers Noctalia as the extension's host.
+
+The login screen (noctalia-greeter) gets wallpaper, palette, corners and font through "noctalia msg greeter-sync",
+which asks for the admin password unless "sudo noctalia-greeter passwordless-sync enable <user>" was run.
+The font must be installed system-wide.
+
+Noctalia settings are written with "noctalia msg config-set", into ~/.local/state/noctalia/settings.toml (the
+layer that wins over config.toml): every theme must list all the keys the other themes touch, so that switching
+is complete.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import tomllib
+
+HOME = os.path.expanduser("~")
+CONFIG = os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config")
+STATE = os.environ.get("XDG_STATE_HOME") or os.path.join(HOME, ".local", "state")
+USER_THEMES = os.path.join(CONFIG, "aculos", "themes")
+THEME_DIRS = [USER_THEMES, "/usr/share/aculos/themes"]   # the first one wins, file by file
+ACTIVE = os.path.join(STATE, "aculos", "theme")
+# written by Noctalia's "aculos-icons" template (~/.config/noctalia/templates.toml) whenever the palette changes
+NOCTALIA_WALLPAPER = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.join(HOME, ".cache"), "aculos", "wallpaper")
+NIRI_THEME = os.path.join(CONFIG, "niri", "cfg", "theme.kdl")
+KITTY_CONF = os.path.join(CONFIG, "kitty", "kitty.conf")
+KITTY_THEME = os.path.join(CONFIG, "kitty", "theme.conf")
+STARSHIP = os.path.join(CONFIG, "starship.toml")
+STARSHIP_THEME = os.path.join(CONFIG, "starship", "theme.toml")   # STARSHIP_CONFIG in .zshrc
+PALETTES = os.path.join(CONFIG, "noctalia", "palettes")
+CSS_IMPORT = '@import url("theme.css");'
+USER_ICONS = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local", "share"), "icons")
+ICON_DIRS = [USER_ICONS] + [os.path.join(d, "icons") for d in
+                            (os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":") if d]
+
+
+def fail(message):
+    print(f"aculos theme: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def warn(message):
+    print(f"aculos theme: {message}", file=sys.stderr)
+
+
+def themes():
+    names = set()
+    for base in THEME_DIRS:
+        if os.path.isdir(base):
+            names.update(d for d in os.listdir(base) if os.path.isfile(os.path.join(base, d, "theme.toml")))
+    return sorted(names)
+
+
+def find(name, file):
+    """Path of a file of theme <name>: the user's copy if there is one, otherwise the image's; None if neither."""
+    if os.path.isabs(file):
+        return file if os.path.exists(file) else None
+    for base in THEME_DIRS:
+        path = os.path.join(base, name, os.path.expanduser(file))
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def load(name):
+    with open(find(name, "theme.toml"), "rb") as f:
+        return tomllib.load(f)
+
+
+def active():
+    try:
+        with open(ACTIVE) as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def toml(value):
+    """TOML value for noctalia msg config-set."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    if isinstance(value, str):
+        return json.dumps(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(toml(v) for v in value) + "]"
+    fail(f"unsupported value: {value!r}")
+
+
+def noctalia(*args):
+    r = subprocess.run(["noctalia", "msg", *args], capture_output=True, text=True)
+    if r.returncode != 0:
+        fail(f"noctalia msg {' '.join(args)}: {(r.stderr or r.stdout).strip()}")
+
+
+def apply_niri(name):
+    source = find(name, "niri.kdl")
+    before = open(NIRI_THEME).read() if os.path.exists(NIRI_THEME) else None
+    os.makedirs(os.path.dirname(NIRI_THEME), exist_ok=True)
+    if source:
+        shutil.copyfile(source, NIRI_THEME)
+    else:
+        with open(NIRI_THEME, "w") as f:
+            f.write("// Theme without niri rules (written by aculos theme).\n")
+    r = subprocess.run(["niri", "validate"], capture_output=True, text=True)
+    if r.returncode != 0:
+        if before is None:
+            os.remove(NIRI_THEME)
+        else:
+            with open(NIRI_THEME, "w") as f:
+                f.write(before)
+        fail("the niri part is not valid, the previous one is kept:\n" + r.stderr.strip()[-600:])
+
+
+def apply_kitty(settings):
+    os.makedirs(os.path.dirname(KITTY_THEME), exist_ok=True)
+    with open(KITTY_THEME, "w") as f:
+        f.write("# Written by aculos theme: font and details of the active theme. Colours come from Noctalia "
+                "(themes/noctalia.conf).\n")
+        for key, value in settings.items():
+            f.write(f"{key} {value}\n")
+    lines = open(KITTY_CONF).read().splitlines() if os.path.exists(KITTY_CONF) else []
+    if "include theme.conf" not in lines:
+        with open(KITTY_CONF, "a") as f:
+            f.write("include theme.conf\n")
+    subprocess.run(["pkill", "-USR1", "-x", "kitty"], capture_output=True)
+
+
+def add_import(css):
+    """@import of theme.css at the top of a CSS file (gtk.css, userChrome.css)."""
+    lines = open(css).read().splitlines() if os.path.exists(css) else []
+    new = [CSS_IMPORT] + [line for line in lines if line != CSS_IMPORT]
+    if new != lines:
+        with open(css, "w") as f:   # @import must be at the top of the file
+            f.write("\n".join(new) + "\n")
+
+
+def apply_prompt(prompt):
+    """Colour of the prompt arrow (starship): [prompt] color = "<starship style>" in theme.toml. Writes
+    ~/.config/starship/theme.toml = starship.toml + the colour; .zshrc uses it as STARSHIP_CONFIG."""
+    base = open(STARSHIP).read() if os.path.exists(STARSHIP) else ""
+    os.makedirs(os.path.dirname(STARSHIP_THEME), exist_ok=True)
+    with open(STARSHIP_THEME, "w") as f:
+        f.write("# Written by aculos theme: ~/.config/starship.toml plus the prompt colour of the active theme.\n" + base)
+        if prompt.get("color"):
+            colour = prompt["color"]
+            f.write(f'\n[character]\nsuccess_symbol = "[❯]({colour})"\nvimcmd_symbol = "[❮]({colour})"\n')
+
+
+def apply_gtk(name):
+    for version in ("gtk-3.0", "gtk-4.0"):
+        source = find(name, f"{version}.css")
+        target = os.path.join(CONFIG, version)
+        os.makedirs(target, exist_ok=True)
+        with open(os.path.join(target, "theme.css"), "w") as f:
+            if source:
+                f.write(open(source).read())
+            else:
+                f.write("/* Theme without GTK rules (written by aculos theme). */\n")
+        add_import(os.path.join(target, "gtk.css"))
+
+
+# Firefox-family browsers: profile folders (XDG and legacy) and the folders where they look for native hosts
+BROWSERS = {
+    "Firefox": ([os.path.join(CONFIG, "mozilla", "firefox"), os.path.join(HOME, ".mozilla", "firefox")],
+                [os.path.join(HOME, ".mozilla", "native-messaging-hosts"),
+                 os.path.join(CONFIG, "mozilla", "native-messaging-hosts")]),
+    "LibreWolf": ([os.path.join(CONFIG, "librewolf", "librewolf"), os.path.join(HOME, ".librewolf")],
+                  [os.path.join(HOME, ".librewolf", "native-messaging-hosts"),
+                   os.path.join(CONFIG, "librewolf", "native-messaging-hosts")]),
+}
+
+
+def profiles(bases):
+    """Profile folders listed in profiles.ini."""
+    found = []
+    for base in bases:
+        ini = os.path.join(base, "profiles.ini")
+        if not os.path.isfile(ini):
+            continue
+        relative = True
+        for line in open(ini):
+            line = line.strip()
+            if line.startswith("IsRelative="):
+                relative = line.endswith("1")
+            elif line.startswith("Path="):
+                p = line[5:]
+                p = os.path.join(base, p) if relative else p
+                if os.path.isdir(p):
+                    found.append(p)
+                relative = True
+    return found
+
+
+def apply_browsers(name):
+    """Firefox and LibreWolf: Noctalia as host for the Pywalfox extension (colours) and chrome/theme.css (shapes)."""
+    host = os.path.join(HOME, ".mozilla", "native-messaging-hosts", "pywalfox.json")
+    if not os.path.exists(host):
+        subprocess.run(["noctalia", "firefox-theme", "install"], capture_output=True)
+    source = find(name, "firefox.css")
+    rules = open(source).read() if source else "/* Theme without browser rules (written by aculos theme). */\n"
+    for bases, host_dirs in BROWSERS.values():
+        if not any(os.path.isdir(b) for b in bases):
+            continue
+        if os.path.exists(host):
+            for d in host_dirs:
+                if os.path.normpath(os.path.join(d, "pywalfox.json")) != os.path.normpath(host):
+                    os.makedirs(d, exist_ok=True)
+                    shutil.copyfile(host, os.path.join(d, "pywalfox.json"))
+        for profile in profiles(bases):
+            chrome = os.path.join(profile, "chrome")
+            os.makedirs(chrome, exist_ok=True)
+            with open(os.path.join(chrome, "theme.css"), "w") as f:
+                f.write(rules)
+            add_import(os.path.join(chrome, "userChrome.css"))
+            user_js = os.path.join(profile, "user.js")
+            pref = 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);'
+            lines = open(user_js).read().splitlines() if os.path.exists(user_js) else []
+            if pref not in lines:
+                with open(user_js, "a") as f:
+                    f.write(pref + "\n")
+
+
+def find_icons(name):
+    for d in ICON_DIRS:
+        if os.path.isfile(os.path.join(d, name, "index.theme")):
+            return os.path.join(d, name)
+    return None
+
+
+def coloured_papirus(base, colour):
+    """A Papirus theme with folders of another colour (like papirus-folders, but per user):
+    ~/.local/share/icons/<base>-<colour>, which inherits from <base> and points the folder icons to the coloured ones."""
+    base_dir, papirus = find_icons(base), find_icons("Papirus")
+    if not base_dir or not papirus:
+        return None
+    name = f"{base}-{colour}"
+    target = os.path.join(USER_ICONS, name)
+    shutil.rmtree(target, ignore_errors=True)
+    os.makedirs(target)
+    index = open(os.path.join(base_dir, "index.theme")).read()
+    index = re.sub(r"^Name=.*$", f"Name={name}", index, count=1, flags=re.M)
+    index = re.sub(r"^Inherits=.*$", f"Inherits={base},hicolor", index, count=1, flags=re.M)
+    with open(os.path.join(target, "index.theme"), "w") as f:
+        f.write(index)
+    pattern = re.compile(rf"^(folder|user)-{re.escape(colour)}(-.*)?\.svg$")
+    linked = 0
+    for size in os.listdir(papirus):
+        places = os.path.join(papirus, size, "places")
+        if not os.path.isdir(places):
+            continue
+        out = os.path.join(target, size, "places")
+        os.makedirs(out, exist_ok=True)
+        for f in os.listdir(places):
+            m = pattern.match(f)
+            if m:
+                os.symlink(os.path.join(places, f), os.path.join(out, f"{m.group(1)}{m.group(2) or ''}.svg"))
+                linked += 1
+    return name if linked else None
+
+
+def brightness(image):
+    """Mean brightness of an image, 0 (black) to 1 (white); None if it cannot be measured."""
+    try:
+        r = subprocess.run(["magick", image, "-colorspace", "Gray", "-resize", "1x1!", "-format", "%[fx:mean]", "info:"],
+                           capture_output=True, text=True, timeout=30)
+        return float(r.stdout.strip())
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
+def icons_for(icons, wallpaper):
+    """The icon theme name: fixed, or picked from the wallpaper (dark wallpaper -> dark_wallpaper icons)."""
+    if "theme" in icons:
+        return icons["theme"]
+    level = brightness(wallpaper) if wallpaper and os.path.isfile(wallpaper) else None
+    return icons["light_wallpaper"] if level is not None and level >= 0.5 else icons["dark_wallpaper"]
+
+
+def apply_icons(icons, wallpaper=""):
+    if not icons:
+        return
+    name = icons_for(icons, wallpaper)
+    if icons.get("folders"):
+        name = coloured_papirus(name, icons["folders"]) or name
+    if not find_icons(name):
+        warn(f"icons '{name}' not installed, keeping the current ones")
+        return
+    subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", name], check=False)
+
+
+def apply_gtk_font(gtk):
+    """Font of GTK apps (and of Flatpaks, through the portal): [gtk] font = "<family> <size>" in theme.toml."""
+    if gtk.get("font"):
+        subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "font-name", gtk["font"]], check=False)
+
+
+def current_wallpaper():
+    """The wallpaper Noctalia shows on the first output; empty if there is none."""
+    try:
+        outputs = json.loads(subprocess.run(["niri", "msg", "-j", "outputs"], capture_output=True, text=True).stdout)
+        output = sorted(outputs)[:1]
+    except (ValueError, TypeError):
+        output = []
+    r = subprocess.run(["noctalia", "msg", "wallpaper-get", *output], capture_output=True, text=True)
+    return r.stdout.strip().splitlines()[-1] if r.returncode == 0 and r.stdout.strip() else ""
+
+
+def theme_wallpaper(name, theme):
+    """The theme's wallpaper: a wallpaper.* in the user's folder, otherwise the one theme.toml names."""
+    folder = os.path.join(USER_THEMES, name)
+    if os.path.isdir(folder):
+        for f in sorted(os.listdir(folder)):
+            if f.startswith("wallpaper.") and os.path.isfile(os.path.join(folder, f)):
+                return os.path.join(folder, f)
+    return find(name, theme["wallpaper"]) if "wallpaper" in theme else None
+
+
+def apply_wallpaper(name, theme, changed):
+    """The theme's wallpaper when the theme changes (or with --wallpaper, or when there is none); otherwise the
+    chosen one stays."""
+    current = current_wallpaper()
+    if not changed and current and os.path.isfile(current):
+        return
+    wallpaper = theme_wallpaper(name, theme)
+    if wallpaper:
+        noctalia("wallpaper-set", wallpaper)
+    elif "wallpaper" in theme:
+        warn(f"wallpaper {theme['wallpaper']} not found, keeping the current one")
+
+
+def apply(name, greeter=True, reset_wallpaper=False):
+    if name not in themes():
+        fail(f"no theme '{name}' (themes: {', '.join(themes()) or 'none'})")
+    theme = load(name)
+    previous = active()
+    previous_font = load(previous).get("font") if previous in themes() else None
+
+    if "palette" in theme:
+        palette = find(name, theme["palette"])
+        if not palette:
+            fail(f"palette {theme['palette']} of theme '{name}' not found")
+        os.makedirs(PALETTES, exist_ok=True)
+        shutil.copy(palette, PALETTES)
+    apply_niri(name)
+    start = time.time()
+    for key, value in theme.get("noctalia", {}).items():
+        noctalia("config-set", key, toml(value))
+    # The first time a community template is used, Noctalia downloads it after having already tried it: apply all again
+    noctalia("templates-apply")
+    apply_wallpaper(name, theme, name != previous or reset_wallpaper)
+    apply_kitty(theme.get("kitty", {}))
+    # The text size (aculos text-size) multiplies the theme's terminal size: compute it again for the new theme
+    if shutil.which("aculos-text-size") and os.path.exists(os.path.join(CONFIG, "aculos", "text-size")):
+        subprocess.run(["aculos-text-size", "--apply"], stdout=subprocess.DEVNULL, check=False)
+    apply_gtk(name)
+    apply_gtk_font(theme.get("gtk", {}))
+    apply_icons(theme.get("icons"), current_wallpaper())
+    apply_prompt(theme.get("prompt", {}))
+    apply_browsers(name)
+
+    os.makedirs(os.path.dirname(ACTIVE), exist_ok=True)
+    with open(ACTIVE, "w") as f:
+        f.write(name + "\n")
+    locked = session_locked()
+    # Noctalia changes font only when it restarts; not while locked, because that would close the lock screen
+    if theme.get("font") != previous_font:
+        if locked:
+            warn("session locked, the new font arrives when Noctalia restarts (systemctl --user restart noctalia)")
+        else:
+            restart_noctalia()
+    print(f"Active theme: {name}")
+    # Not with --after-apply on the active theme: syncing asks for a password
+    if greeter:
+        if locked:
+            warn("session locked, update the login screen later with: aculos theme --greeter")
+        else:
+            wait_for_palette(start)
+            sync_greeter()
+
+
+def wait_for_palette(start):
+    """Noctalia recomputes the palette (for instance from a new wallpaper) a moment later, on its own: the greeter must
+    be synced only afterwards, or it gets the old colours. Sign that it is done: the
+    "niri" template, on in every theme, has rewritten noctalia.kdl and the file has not changed for a second."""
+    kdl = os.path.join(CONFIG, "niri", "noctalia.kdl")
+
+    def modified():
+        try:
+            return os.path.getmtime(kdl)
+        except OSError:
+            return 0.0
+    deadline = time.time() + 10
+    while time.time() < deadline and modified() < start:
+        time.sleep(0.2)
+    last = modified()
+    while time.time() < deadline:
+        time.sleep(1)
+        if modified() == last:
+            return
+        last = modified()
+
+
+def session_locked():
+    """True if a graphical session of the user is locked (restarting Noctalia now would leave niri on red)."""
+    r = subprocess.run(["loginctl", "list-sessions", "--no-legend"], capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        fields = line.split()
+        if len(fields) >= 4 and fields[2] == os.environ.get("USER", "") and fields[3].startswith("seat"):
+            state = subprocess.run(["loginctl", "show-session", fields[0], "-p", "LockedHint", "--value"],
+                                   capture_output=True, text=True).stdout.strip()
+            if state == "yes":
+                return True
+    return False
+
+
+def restart_noctalia():
+    """Restart Noctalia and wait until its polkit agent is ready (needed to sync the greeter)."""
+    since = time.strftime("%Y-%m-%d %H:%M:%S")
+    subprocess.run(["systemctl", "--user", "restart", "noctalia.service"], check=False)
+    for _ in range(40):
+        r = subprocess.run(["journalctl", "--user", "-u", "noctalia.service", "--since", since, "-q",
+                            "-g", "polkit authentication agent active"], capture_output=True, text=True)
+        if r.stdout.strip():
+            return
+        time.sleep(0.25)
+
+
+def sync_greeter():
+    """Ask Noctalia to copy the look to the login screen. Noctalia does it in the background, after the admin
+    password: here we only know the request went out (the outcome is in Noctalia's log)."""
+    for _ in range(20):
+        r = subprocess.run(["noctalia", "msg", "greeter-sync"], capture_output=True, text=True)
+        if r.returncode == 0:
+            print("Login screen: update requested. Confirm the password prompt, if one appears;\n"
+                  "the outcome is in the log: journalctl --user -u noctalia -g greeter-sync")
+            return
+        if "not running" not in (r.stderr + r.stdout):
+            break
+        time.sleep(0.5)
+    warn("login screen not updated: " + (r.stderr or r.stdout).strip())
+
+
+def list_themes():
+    current = active()
+    for name in themes():
+        description = load(name).get("description", "")
+        mark = "*" if name == current else " "
+        print(f"{mark} {name:<14} {description}")
+    if not themes():
+        print(f"No themes in {' or '.join(THEME_DIRS)}")
+
+
+def session_environment():
+    """From a shell without the desktop's variables (over SSH, for instance) "noctalia msg" says "noctalia is not
+    running": take them from the user manager, where niri imports them."""
+    if os.environ.get("WAYLAND_DISPLAY"):
+        return True
+    r = subprocess.run(["systemctl", "--user", "show-environment"], capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        key, _, value = line.partition("=")
+        if key in ("WAYLAND_DISPLAY", "NIRI_SOCKET", "DISPLAY", "DBUS_SESSION_BUS_ADDRESS") and not os.environ.get(key):
+            os.environ[key] = value
+    return bool(os.environ.get("WAYLAND_DISPLAY"))
+
+
+def main():
+    args = sys.argv[1:]
+    if args and args[0] not in ("-h", "--help") and not session_environment():
+        if args[0] == "--after-apply":   # a hook outside a desktop session: nothing to restart
+            warn("no desktop session, theme not applied again (run: aculos theme --greeter)")
+            return
+        fail("no desktop session: run aculos theme from the desktop")
+    if not args:
+        return list_themes()
+    if args[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return
+    if args in (["--greeter"], ["--wallpaper"]):
+        if not active():
+            fail("no active theme")
+        return apply(active(), greeter=args[0] == "--greeter", reset_wallpaper=args[0] == "--wallpaper")
+    if args == ["--icons"]:
+        name = active()
+        if name in themes():
+            try:
+                with open(NOCTALIA_WALLPAPER) as f:
+                    wallpaper = f.read().strip()
+            except OSError:
+                wallpaper = current_wallpaper()
+            apply_icons(load(name).get("icons"), wallpaper)
+        return
+    if len(args) == 2 and args[0] == "--after-apply":
+        return apply(args[1], greeter=args[1] != active())
+    if len(args) == 1 and not args[0].startswith("-"):
+        return apply(args[0])
+    print(__doc__.strip(), file=sys.stderr)
+    sys.exit(2)
+
+
+if __name__ == "__main__":
+    main()

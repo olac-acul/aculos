@@ -5,7 +5,7 @@
 -- other text searches all items. "try <name>" offers to try a program (aculos try), "save <name>" to save the
 -- current screen layout (aculos display save). Items also show up in the launcher's global search.
 -- Commands that ask for a password or print something worth reading run in kitty, kept open at the end; the others
--- run quietly and answer with a notification. Themes are listed only when the "theme" command exists (dotfiles).
+-- run quietly and answer with a notification. Themes come from "aculos theme".
 
 local function tr(key, vars)
     return noctalia.tr(key, vars)
@@ -81,13 +81,10 @@ for _, size in ipairs({ 90, 100, 110, 125 }) do
         function() quiet({ "aculos", "text-size", tostring(size) }, tr("item.text-size")) end, size })
 end
 
--- The shell's PATH lacks ~/.local/bin, where the dotfiles put "theme"
-local USER_PATH = 'PATH="$HOME/.local/bin:$PATH"; '
-
--- Themes, read from "theme" (refreshed every time the menu opens): { name, description, active }
+-- Themes, read from "aculos theme" (refreshed every time the menu opens): { name, description, active }
 local themes = {}
 local function loadThemes()
-    noctalia.runAsync({ "sh", "-c", USER_PATH .. "command -v theme >/dev/null && theme" }, function(r)
+    noctalia.runAsync({ "aculos", "theme" }, function(r)
         local list = {}
         if r and r.exitCode == 0 then
             for line in string.gmatch(r.stdout or "", "[^\n]+") do
@@ -120,7 +117,7 @@ local function themeRows()
     local rows = {}
     for _, t in ipairs(themes) do
         local id = "theme:" .. t.name
-        actions[id] = function() terminal({ "sh", "-c", USER_PATH .. 'exec theme "$1"', "theme", t.name }) end
+        actions[id] = function() terminal({ "aculos", "theme", t.name }) end
         table.insert(rows, {
             id = id,
             title = tr(t.active and "item.theme-active" or "item.theme", { name = t.name }),

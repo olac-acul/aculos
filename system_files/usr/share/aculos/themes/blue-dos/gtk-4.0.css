@@ -1,0 +1,4 @@
+/* "Blue DOS" theme for GTK 4 apps (libadwaita): everything square. Noctalia writes the colours (noctalia.css). */
+* {
+    border-radius: 0;
+}

@@ -1,0 +1,57 @@
+# "Blue DOS" theme: night blue, yellow and cyan, the Terminus cell font, everything square and without shadows.
+# Inspired by Hyprland-Desktop-Viola-Blu from RiccardoPP/dotfiles (MIT), adapted to niri and Noctalia.
+description = "DOS-style night blue, Terminus, square corners"
+wallpaper = "wallpaper.png"       # the ░ pattern of text-mode desktops, 3840x2400, centred (not scaled)
+palette = "BlueDOS.json"          # copied to ~/.config/noctalia/palettes/
+font = "Terminus (TTF)"           # ax86-terminus-ttf-fonts package
+
+# Flat, complete icons; folders yellow like the active colour (papirus-icon-theme* packages)
+[icons]
+theme = "Papirus-Dark"
+folders = "yellow"
+
+[gtk]
+font = "Terminus (TTF) 11"        # font of GTK apps
+
+# yellow prompt arrow, like the active colour (bright yellow of the terminal palette)
+[prompt]
+color = "bold bright-yellow"
+
+[noctalia]
+"theme.source" = "custom"
+"theme.custom_palette" = "BlueDOS"
+# kitty and GTK apps take the palette's colours
+"theme.templates.enable_builtin_templates" = true
+"theme.templates.builtin_ids" = ["kitty", "gtk3", "gtk4", "niri", "btop"]
+# Firefox and LibreWolf (Pywalfox extension), micro, bat, fzf and VSCodium
+"theme.templates.enable_community_templates" = true
+"theme.templates.community_ids" = ["pywalfox", "micro", "bat", "fzf", "vscode"]
+"shell.font_family" = "Terminus (TTF)"
+"shell.corner_radius_scale" = 0.0
+"shell.popup_shadows" = false
+"shell.panel.transparency_mode" = "solid"
+"shell.panel.shadow" = false
+# solid bar from edge to edge, like the DOS menu bar
+"bar.default.font_family" = "Terminus (TTF)"
+"bar.default.background_opacity" = 1.0
+"bar.default.margin_ends" = 0
+"bar.default.margin_edge" = 0
+"bar.default.border_width" = 1.0
+"bar.default.radius" = 0
+"bar.default.shadow" = false
+"bar.default.compositor_blur" = false
+# workspaces as numbers, without pills
+"widget.workspaces.style" = "minimal"
+# black lock screen (solid black veil over the wallpaper): with the "crt" transition it looks like a monitor
+# switching off and on
+"lockscreen.blur_intensity" = 0.0
+"lockscreen.tint_color" = "#000000"
+"lockscreen.tint_intensity" = 1.0
+"wallpaper.fill_mode" = "center"
+"wallpaper.fill_color" = "#00005f"
+
+[kitty]
+font_family = "Terminus (TTF)"
+font_size = "13.0"
+cursor_shape = "block"
+window_padding_width = "6"

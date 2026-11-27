@@ -1,0 +1,46 @@
+# "Rounded" theme: Material colours from the wallpaper, rounded corners, Adwaita Sans.
+# It sets again every key the other themes change (see aculos theme --help).
+description = "colours from the wallpaper, rounded corners"
+wallpaper = "/usr/share/backgrounds/fedora-workstation/glasscurtains_dark.webp"
+font = "Adwaita Sans"
+
+[icons]
+theme = "Adwaita"
+
+[gtk]
+font = "Adwaita Sans 11"        # font of GTK apps
+
+[noctalia]
+"theme.source" = "wallpaper"
+"theme.wallpaper_scheme" = "m3-tonal-spot"
+# "niri" template (palette colours for niri, which the theme overrides with its fixed ring) and "btop"
+"theme.templates.enable_builtin_templates" = true
+"theme.templates.builtin_ids" = ["niri", "btop"]
+# Firefox and LibreWolf (Pywalfox extension), micro, bat, fzf and VSCodium take the wallpaper's colours
+"theme.templates.enable_community_templates" = true
+"theme.templates.community_ids" = ["pywalfox", "micro", "bat", "fzf", "vscode"]
+"shell.font_family" = "Adwaita Sans"
+"shell.corner_radius_scale" = 0.7
+"shell.popup_shadows" = true
+"shell.panel.transparency_mode" = "soft"
+"shell.panel.shadow" = true
+"bar.default.font_family" = "Adwaita Sans"
+"bar.default.background_opacity" = 0.93
+"bar.default.margin_ends" = 4
+"bar.default.margin_edge" = 4
+"bar.default.border_width" = 0.0
+"bar.default.radius" = 8
+"bar.default.shadow" = true
+"bar.default.compositor_blur" = true
+"widget.workspaces.style" = "regular"
+# black lock screen (solid black veil over the wallpaper): with the "crt" transition it looks like a monitor
+# switching off and on
+"lockscreen.blur_intensity" = 0.0
+"lockscreen.tint_color" = "#000000"
+"lockscreen.tint_intensity" = 1.0
+"wallpaper.fill_mode" = "crop"
+"wallpaper.fill_color" = "#000000"
+
+[kitty]
+# semi-transparent background (the text stays solid)
+background_opacity = "0.85"
