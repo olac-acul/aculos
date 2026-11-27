@@ -4,7 +4,8 @@ Description=The aculOs logo typed letter by letter on black, then a blinking blo
 ModuleName=script
 
 # The animation and the password box are in aculos.script. Images are generated on the logo's pixel grid
-# (8 px per cell): logo-K.png (the first K letters), cursor.png, entry.png, bullet.png, lock.png.
+# (8 px per cell): logo-K.png (the first K letters), cursor.png, entry.png (as wide as logo and final cursor),
+# bullet.png, lock.png.
 # Text (messages, the password prompt) uses the default font: in the initramfs the label plugin has no other.
 [script]
 ImageDir=/usr/share/plymouth/themes/aculos
