@@ -1,0 +1,49 @@
+{
+  "category": {
+    "system": "Sistema",
+    "system-hint": "Aggiornamenti, accesso SSH, configurazione iniziale",
+    "appearance": "Aspetto",
+    "appearance-hint": "Tema, dimensione del testo, sfondo",
+    "screens": "Schermi",
+    "screens-hint": "Disposizioni degli schermi",
+    "battery": "Batteria",
+    "battery-hint": "Soglie di carica",
+    "agents": "Agenti",
+    "agents-hint": "Agenti di programmazione nella scatola",
+    "remote": "Remoto",
+    "remote-hint": "Sessione sul tuo server",
+    "apps": "App",
+    "apps-hint": "App Flatpak, prova un programma"
+  },
+  "item": {
+    "update": "Aggiorna ora",
+    "update-status": "Stato degli aggiornamenti",
+    "ssh-on": "Accendi l'accesso SSH",
+    "ssh-off": "Spegni l'accesso SSH",
+    "setup": "Rifai la configurazione iniziale",
+    "wallpaper": "Scegli lo sfondo",
+    "theme": "Tema: {name}",
+    "theme-active": "Tema: {name} (attivo)",
+    "text-size": "Dimensione del testo",
+    "text-size-value": "Testo al {value}%",
+    "display-next": "Prossima disposizione degli schermi",
+    "display-list": "Disposizioni salvate",
+    "display-save": "Salva la disposizione degli schermi come «{name}»",
+    "battery-status": "Carica e soglie",
+    "battery-full": "Carica al 100% per una volta",
+    "battery-normal": "Torna a 80-85%",
+    "agent-pi": "pi",
+    "agent-pi-local": "pi (modello locale)",
+    "agent-claude": "Claude Code",
+    "agent-codex": "Codex",
+    "remote": "Apri la sessione remota",
+    "flatpak": "Installa le app della lista",
+    "try": "Prova «{name}»"
+  },
+  "hint": {
+    "title": "Scrivi per cercare, oppure «prova <nome>»",
+    "subtitle": "prova <nome> prova un programma, salva <nome> salva la disposizione degli schermi",
+    "try": "Scrivi «prova <nome>» per provare un programma",
+    "save": "Scrivi «salva <nome>» per salvare la disposizione degli schermi"
+  }
+}

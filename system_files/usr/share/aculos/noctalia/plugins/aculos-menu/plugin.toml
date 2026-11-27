@@ -1,0 +1,16 @@
+id = "aculos/menu"
+name = "aculOs menu"
+version = "1.0.0"
+plugin_api = 24
+author = "aculOs"
+license = "Apache-2.0"
+icon = "settings"
+description = "One menu for the aculOs commands: updates, appearance, screens, battery, agents, apps."
+dependencies = ["aculos", "kitty"]
+
+[[launcher_provider]]
+id = "menu"
+entry = "menu.luau"
+prefix = "aculos"
+glyph = "settings"
+include_in_global_search = true

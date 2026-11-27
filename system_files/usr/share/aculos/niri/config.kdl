@@ -375,6 +375,8 @@ binds {
     Mod+T hotkey-overlay-title="Open a Terminal: kitty" { spawn "kitty"; }
     Mod+D hotkey-overlay-title="Run an Application: Noctalia" { spawn-sh "noctalia msg panel-toggle launcher"; }
     Alt+Space hotkey-overlay-title=null { spawn-sh "noctalia msg panel-toggle launcher"; }
+    // aculOs: the aculOs menu (Noctalia launcher, /aculos prefix; plugin in /usr/share/aculos/noctalia/plugins)
+    Mod+Space hotkey-overlay-title="aculOs menu" { spawn-sh "noctalia msg panel-toggle launcher /aculos"; }
     Mod+S hotkey-overlay-title="Control Center: Noctalia" { spawn-sh "noctalia msg panel-toggle control-center"; }
     Mod+Shift+Comma hotkey-overlay-title="Settings: Noctalia" { spawn-sh "noctalia msg settings-toggle"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen: Noctalia" { spawn-sh "noctalia msg session lock"; }
@@ -618,7 +620,7 @@ binds {
     // a matching layout switch hotkey configured in xkb options above.
     // Having both at once on the same hotkey will break the switching,
     // since it will switch twice upon pressing the hotkey (once by xkb, once by niri).
-    // Mod+Space       { switch-layout "next"; }
+    // Mod+Space is the aculOs menu (see above)
     // Mod+Shift+Space { switch-layout "prev"; }
 
     Print { screenshot; }

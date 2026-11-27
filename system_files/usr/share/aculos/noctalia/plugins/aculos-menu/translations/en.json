@@ -1,0 +1,49 @@
+{
+  "category": {
+    "system": "System",
+    "system-hint": "Updates, SSH access, first-login setup",
+    "appearance": "Appearance",
+    "appearance-hint": "Theme, text size, wallpaper",
+    "screens": "Screens",
+    "screens-hint": "Display layouts",
+    "battery": "Battery",
+    "battery-hint": "Charge thresholds",
+    "agents": "Agents",
+    "agents-hint": "Coding agents in a box",
+    "remote": "Remote",
+    "remote-hint": "Session on your server",
+    "apps": "Apps",
+    "apps-hint": "Flatpak apps, try a program"
+  },
+  "item": {
+    "update": "Update now",
+    "update-status": "Update status",
+    "ssh-on": "Turn SSH access on",
+    "ssh-off": "Turn SSH access off",
+    "setup": "Run the first-login setup again",
+    "wallpaper": "Choose a wallpaper",
+    "theme": "Theme: {name}",
+    "theme-active": "Theme: {name} (active)",
+    "text-size": "Text size",
+    "text-size-value": "Text size {value}%",
+    "display-next": "Next screen layout",
+    "display-list": "Saved screen layouts",
+    "display-save": "Save the screen layout as \"{name}\"",
+    "battery-status": "Charge and thresholds",
+    "battery-full": "Charge to 100% once",
+    "battery-normal": "Back to 80-85%",
+    "agent-pi": "pi",
+    "agent-pi-local": "pi (local model)",
+    "agent-claude": "Claude Code",
+    "agent-codex": "Codex",
+    "remote": "Open the remote session",
+    "flatpak": "Install the apps in the list",
+    "try": "Try \"{name}\""
+  },
+  "hint": {
+    "title": "Type to search, or \"try <name>\"",
+    "subtitle": "try <name> tries a program, save <name> saves the screen layout",
+    "try": "Type \"try <name>\" to try a program",
+    "save": "Type \"save <name>\" to save the screen layout"
+  }
+}
